@@ -1,4 +1,4 @@
-﻿'use client'
+'use client'
 import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
@@ -30,8 +30,18 @@ export default function LoginPage() {
         const { data, error } = await supabase.auth.signUp({ email, password })
         if (error) { setError(error.message); return }
         if (data.user) {
-          const { error: pe } = await supabase.from('profiles').insert({ id:data.user.id, name, role, team:team||'General' })
-          if (pe) { setError(pe.message); return }
+          const { data: existing } = await supabase.from('profiles').select('id').eq('id', data.user.id).single()
+          if (!existing) {
+            const { error: pe } = await supabase.from('profiles').insert({
+              id: data.user.id,
+              name: name.trim(),
+              role,
+              team: team.trim() || 'General',
+              hourly_rate: 0,
+              leave_allowance: 21,
+            })
+            if (pe) { setError(pe.message); return }
+          }
           router.push('/dashboard'); router.refresh()
         }
       }
@@ -78,7 +88,7 @@ export default function LoginPage() {
         </div>
         <div style={{ marginBottom:22 }}>
           <label style={lbl}>Password</label>
-          <input style={inp} type="password" value={password} onChange={e=>setPassword(e.target.value)} placeholder="••••••••" onKeyDown={e=>e.key==='Enter'&&handleSubmit()} />
+          <input style={inp} type="password" value={password} onChange={e=>setPassword(e.target.value)} placeholder="????????" onKeyDown={e=>e.key==='Enter'&&handleSubmit()} />
         </div>
 
         {error && (
