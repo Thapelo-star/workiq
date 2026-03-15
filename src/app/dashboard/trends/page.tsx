@@ -1,4 +1,4 @@
-﻿'use client'
+'use client'
 import { useState, useEffect, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Profile, TimeLog, BILLABLE_CATEGORIES } from '@/lib/types'
@@ -191,7 +191,7 @@ export default function TrendsPage() {
   const billableHours = filteredLogs.filter(l=>BILLABLE_CATEGORIES.includes(l.category as any)).reduce((s,l)=>s+Number(l.hours),0)
   const billablePct = totalHours > 0 ? Math.round((billableHours/totalHours)*100) : 0
   const avgWeekly = weeks.length > 0 ? parseFloat((weeks.reduce((s,w)=>s+w.total,0)/weeks.length).toFixed(1)) : 0
-  const uniqueTeams = [...new Set(allProfiles.map(p=>p.team).filter(Boolean))]
+  const uniqueTeams = Array.from(new Set(allProfiles.map(p=>p.team).filter(Boolean)))
   const selectedUserProfile = allProfiles.find(p=>p.id===selectedUser)
 
   const scopeLabel = (() => {
@@ -254,10 +254,10 @@ export default function TrendsPage() {
         <div>
           <div style={{ fontSize:16, fontWeight:700, color:'#1a1d2e' }}>{scopeLabel}</div>
           {scope==='company' && isElevated && (
-            <div style={{ fontSize:12, color:'#6b7280' }}>{allProfiles.length} people · {filteredLogs.length} log entries</div>
+            <div style={{ fontSize:12, color:'#6b7280' }}>{allProfiles.length} people ? {filteredLogs.length} log entries</div>
           )}
           {scope==='user' && selectedUserProfile && (
-            <div style={{ fontSize:12, color:'#6b7280' }}>{selectedUserProfile.role} · {selectedUserProfile.team}</div>
+            <div style={{ fontSize:12, color:'#6b7280' }}>{selectedUserProfile.role} ? {selectedUserProfile.team}</div>
           )}
         </div>
       </div>
@@ -325,7 +325,7 @@ export default function TrendsPage() {
                     <div key={team} style={{ marginBottom:14 }}>
                       <div style={{ display:'flex', justifyContent:'space-between', marginBottom:5 }}>
                         <span style={{ fontSize:13, fontWeight:500 }}>{team}</span>
-                        <span style={{ fontSize:13, fontFamily:'DM Mono,monospace', fontWeight:600, color:COLORS[i%COLORS.length] }}>{hours.toFixed(1)}h · {pct}%</span>
+                        <span style={{ fontSize:13, fontFamily:'DM Mono,monospace', fontWeight:600, color:COLORS[i%COLORS.length] }}>{hours.toFixed(1)}h ? {pct}%</span>
                       </div>
                       <div style={{ height:7, background:'#f4f6fb', borderRadius:4, overflow:'hidden' }}>
                         <div style={{ width:pct+'%', height:'100%', background:COLORS[i%COLORS.length], borderRadius:4 }} />
@@ -364,7 +364,7 @@ export default function TrendsPage() {
 
           {scope==='user' && selectedUser && selectedUserProfile && (
             <Card>
-              <CardTitle>Individual Summary — {selectedUserProfile.name}</CardTitle>
+              <CardTitle>Individual Summary ? {selectedUserProfile.name}</CardTitle>
               <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:20 }}>
                 <div>
                   <StatRow label="Total Hours" value={totalHours.toFixed(1)+'h'} />
@@ -393,3 +393,4 @@ export default function TrendsPage() {
     </div>
   )
 }
+

@@ -1,4 +1,4 @@
-﻿'use client'
+'use client'
 import { useState, useEffect, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Invoice, TimeLog, ProjectRate } from '@/lib/types'
@@ -28,7 +28,7 @@ export default function InvoicingPage() {
     const { data: inv } = await supabase.from('invoices').select('*').order('created_at', { ascending:false })
     setInvoices(inv || [])
     const { data: logs } = await supabase.from('time_logs').select('project').limit(500)
-    const unique = [...new Set((logs||[]).map((l:any) => l.project))].sort()
+    const unique = Array.from(new Set((logs||[]).map((l:any) => l.project))).sort()
     setProjects(unique)
     const { data: r } = await supabase.from('project_rates').select('*')
     setRates(r || [])
@@ -171,3 +171,4 @@ export default function InvoicingPage() {
     </div>
   )
 }
+

@@ -1,4 +1,4 @@
-﻿'use client'
+'use client'
 import { useState, useEffect, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Client } from '@/lib/types'
@@ -10,9 +10,12 @@ export default function ClientsPage() {
   const [selected, setSelected] = useState<Client|null>(null)
   const [tab, setTab] = useState<'list'|'new'>('list')
   const [msg, setMsg] = useState('')
-  const [name, setName] = useState(''); const [contact, setContact] = useState('')
-  const [email, setEmail] = useState(''); const [phone, setPhone] = useState('')
-  const [industry, setIndustry] = useState(''); const [notes, setNotes] = useState('')
+  const [name, setName] = useState('')
+  const [contact, setContact] = useState('')
+  const [email, setEmail] = useState('')
+  const [phone, setPhone] = useState('')
+  const [industry, setIndustry] = useState('')
+  const [notes, setNotes] = useState('')
 
   const load = useCallback(async () => {
     const { data } = await supabase.from('clients').select('*').order('name')
@@ -26,7 +29,8 @@ export default function ClientsPage() {
     const { data: { user } } = await supabase.auth.getUser()
     const { error } = await supabase.from('clients').insert({ name, contact_name:contact, contact_email:email, contact_phone:phone, industry, notes, created_by:user?.id })
     if (error) { setMsg(error.message); return }
-    setMsg('Client added.'); setName(''); setContact(''); setEmail(''); setPhone(''); setIndustry(''); setNotes('')
+    setMsg('Client added.')
+    setName(''); setContact(''); setEmail(''); setPhone(''); setIndustry(''); setNotes('')
     load(); setTab('list'); setTimeout(() => setMsg(''), 3000)
   }
 
@@ -42,14 +46,15 @@ export default function ClientsPage() {
 
       <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:16, marginBottom:24 }}>
         {[['Total Clients',clients.length],['Active',clients.filter(c=>c.status==='Active').length],['Inactive',clients.filter(c=>c.status==='Inactive').length]].map(([l,v])=>(
-          <div key={l as string} style={{ background:'#fff', border:'1px solid #e5e7eb', borderRadius:12, padding:'18px 20px' }}>
-            <div style={{ fontSize:10, fontWeight:700, letterSpacing:'0.09em', textTransform:'uppercase', color:'#9ca3af', marginBottom:8 }}>{l}</div>
-            <div style={{ fontSize:32, fontWeight:700, fontFamily:'DM Mono,monospace' }}>{v}</div>
+          <div key={l as string} style={{ background:'#fff', border:'1px solid #e8eaf2', borderRadius:12, padding:'18px 20px', position:'relative', overflow:'hidden' }}>
+            <div style={{ position:'absolute', top:0, left:0, right:0, height:3, background:'#6366f1', borderRadius:'12px 12px 0 0' }} />
+            <div style={{ fontSize:10, fontWeight:700, textTransform:'uppercase', letterSpacing:'0.09em', color:'#a0a8c0', marginBottom:8 }}>{l}</div>
+            <div style={{ fontSize:32, fontWeight:800, fontFamily:'DM Mono,monospace', color:'#6366f1' }}>{v}</div>
           </div>
         ))}
       </div>
 
-      <div style={{ display:'flex', gap:2, borderBottom:'1px solid #e5e7eb', marginBottom:20 }}>
+      <div style={{ display:'flex', gap:2, borderBottom:'1px solid #e8eaf2', marginBottom:20 }}>
         {(['list','new'] as const).map(t=>(
           <div key={t} onClick={()=>setTab(t)}
             style={{ padding:'8px 18px', fontSize:13, cursor:'pointer', color:tab===t?'#6366f1':'#6b7280', borderBottom:tab===t?'2px solid #6366f1':'2px solid transparent', marginBottom:-1, fontWeight:tab===t?600:400 }}>
@@ -79,11 +84,11 @@ export default function ClientsPage() {
             {clients.map(c=>(
               <tr key={c.id} onClick={()=>setSelected(selected?.id===c.id?null:c)} style={{ cursor:'pointer', background:selected?.id===c.id?'#fafbff':'transparent' }}>
                 <Td style={{ fontWeight:600 }}>{c.name}</Td>
-                <Td style={{ color:'#6b7280' }}>{c.contact_name||'—'}</Td>
-                <Td style={{ fontSize:12, color:'#6b7280' }}>{c.contact_email||'—'}</Td>
-                <Td style={{ color:'#6b7280' }}>{c.industry||'—'}</Td>
+                <Td style={{ color:'#6b7280' }}>{c.contact_name||'?'}</Td>
+                <Td style={{ fontSize:12, color:'#6b7280' }}>{c.contact_email||'?'}</Td>
+                <Td style={{ color:'#6b7280' }}>{c.industry||'?'}</Td>
                 <Td><Badge text={c.status} type={c.status==='Active'?'green':'gray'} /></Td>
-                <Td><Btn small onClick={e=>{e.stopPropagation();toggleStatus(c)}}>{c.status==='Active'?'Deactivate':'Activate'}</Btn></Td>
+                <Td><Btn small onClick={()=>toggleStatus(c)}>{c.status==='Active'?'Deactivate':'Activate'}</Btn></Td>
               </tr>
             ))}
           </Table>
@@ -96,11 +101,11 @@ export default function ClientsPage() {
             </div>
             {[['Industry',selected.industry],['Contact',selected.contact_name],['Email',selected.contact_email],['Phone',selected.contact_phone]].filter(([,v])=>v).map(([l,v])=>(
               <div key={l as string} style={{ marginBottom:12 }}>
-                <div style={{ fontSize:10, fontWeight:700, textTransform:'uppercase', letterSpacing:'0.08em', color:'#9ca3af', marginBottom:3 }}>{l}</div>
+                <div style={{ fontSize:10, fontWeight:700, textTransform:'uppercase', letterSpacing:'0.08em', color:'#a0a8c0', marginBottom:3 }}>{l}</div>
                 <div style={{ fontSize:13, color:'#374151' }}>{v}</div>
               </div>
             ))}
-            {selected.notes && <div style={{ marginTop:8, padding:'10px 12px', background:'#f9fafb', borderRadius:8, fontSize:13, color:'#6b7280', lineHeight:1.5 }}>{selected.notes}</div>}
+            {selected.notes && <div style={{ marginTop:8, padding:'10px 12px', background:'#f4f6fb', borderRadius:8, fontSize:13, color:'#6b7280', lineHeight:1.5 }}>{selected.notes}</div>}
           </Card>
         )}
       </div>

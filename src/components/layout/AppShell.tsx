@@ -42,9 +42,10 @@ const NAV_GROUPS = (role: string, canInvoice: boolean, canSeeProfitability: bool
     { id:'executive', label:'Executive Dashboard', path:'/dashboard/executive', icon:'M16 8v8m-4-5v5m-4-2v2m-2 4h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z' },
   ]})
   if (role === 'Admin') groups.push({ section: 'Admin', items: [
-    { id:'admin-users', label:'Users & Roles',  path:'/dashboard/admin-users', icon:'M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z' },
-    { id:'admin-kpi',   label:'KPI Rules',      path:'/dashboard/admin-kpi',   icon:'M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4' },
-    { id:'admin-org',   label:'Organisation',   path:'/dashboard/admin-org',   icon:'M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4' },
+    { id:'admin-users',          label:'Users & Roles',      path:'/dashboard/admin-users',          icon:'M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z' },
+    { id:'admin-kpi',            label:'KPI Rules',          path:'/dashboard/admin-kpi',            icon:'M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4' },
+    { id:'admin-org',            label:'Organisation',       path:'/dashboard/admin-org',            icon:'M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4' },
+    { id:'admin-accountability', label:'Accountability Map', path:'/dashboard/admin-accountability', icon:'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01' },
   ]})
   return groups
 }
@@ -96,7 +97,7 @@ function SidebarContent({ profile, pathname, onNav }: { profile: Profile; pathna
       </div>
       <div style={{ padding:'12px 16px', borderTop:'1px solid rgba(255,255,255,0.06)', background:'rgba(0,0,0,0.2)' }}>
         <div style={{ fontSize:13, fontWeight:600, color:'#e2e8f0' }}>{profile.name}</div>
-        <div style={{ fontSize:11, color:'rgba(168,176,208,0.6)', marginTop:1 }}>{profile.role} · {profile.team}</div>
+        <div style={{ fontSize:11, color:'rgba(168,176,208,0.6)', marginTop:1 }}>{profile.role} ? {profile.team}</div>
       </div>
     </div>
   )
@@ -158,12 +159,12 @@ export default function AppShell({ profile, children }: { profile: Profile; chil
           {isMobile ? 'Out' : 'Sign out'}
         </button>
       </div>
-
       <div style={{ display:'flex', flex:1, overflow:'hidden', position:'relative' }}>
         {isMobile && sidebarOpen && (
           <div onClick={() => setSidebarOpen(false)} style={{ position:'fixed', inset:0, background:'rgba(15,17,35,0.5)', zIndex:199, backdropFilter:'blur(3px)' }} />
         )}
-        <div style={{ width: isMobile ? 252 : SIDEBAR_W, flexShrink:0, overflowY:'auto', overflowX:'hidden', transition:'all 0.25s cubic-bezier(0.4,0,0.2,1)', zIndex: isMobile ? 200 : 10,
+        <div style={{ width: isMobile ? 252 : SIDEBAR_W, flexShrink:0, overflowY:'auto', overflowX:'hidden',
+          transition:'all 0.25s cubic-bezier(0.4,0,0.2,1)', zIndex: isMobile ? 200 : 10,
           position: isMobile ? 'fixed' : 'relative', top: isMobile ? 58 : 0, bottom:0,
           left: isMobile ? (sidebarOpen ? 0 : -260) : 0,
           boxShadow: isMobile && sidebarOpen ? '8px 0 32px rgba(0,0,0,0.25)' : 'none' }}>
