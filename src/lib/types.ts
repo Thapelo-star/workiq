@@ -1,13 +1,13 @@
-﻿export type Role = 'Employee' | 'Manager' | 'Executive' | 'Admin' | 'Project Lead'
+export type Role = 'Employee' | 'Manager' | 'Executive' | 'Admin' | 'Project Lead'
 
 export type Category =
   | 'Development' | 'Design' | 'Meetings'
   | 'Research' | 'Admin' | 'Client' | 'Training'
-  | 'Test Work' | 'Test Work Admin' | 'Test Work Setup' | 'Other'
+  | 'Test Work' | 'Test Work Admin' | 'Test Work Setup' | 'Consulting' | 'Mine Visit' | 'Other'
 
 export const CATEGORIES: Category[] = [
   'Development','Design','Meetings','Research','Admin','Client','Training',
-  'Test Work','Test Work Admin','Test Work Setup','Other',
+  'Test Work','Test Work Admin','Test Work Setup','Consulting','Mine Visit','Other',
 ]
 export const BILLABLE_CATEGORIES: Category[] = ['Development','Design','Client','Test Work','Test Work Setup']
 export const ALL_ROLES: Role[] = ['Employee','Project Lead','Manager','Executive','Admin']
@@ -121,3 +121,5 @@ export interface Goal {
   target_hours: number; target_billable_pct: number
   notes: string; set_by: string; profiles?: Profile
 }
+
+
