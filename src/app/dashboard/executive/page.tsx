@@ -1,8 +1,10 @@
-﻿import { createClient } from '@/lib/supabase/server'
+import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { computeKpis, computeFlags } from '@/lib/kpi'
 import { KpiCard, Card, CardTitle, PageHeader, Badge } from '@/components/ui'
-import { TimeLog, KpiRules, Profile, LeaveRequest } from '@/lib/types'
+import { TimeLog, KpiRules, Profile } from '@/lib/types'
+
+export const revalidate = 60
 
 export default async function ExecutivePage() {
   const supabase = createClient()
@@ -10,7 +12,7 @@ export default async function ExecutivePage() {
   const { data: me } = await supabase.from('profiles').select('*').eq('id', user!.id).single() as { data: Profile }
   if (!['Manager','Executive','Admin'].includes(me?.role)) redirect('/dashboard')
 
-  const [{ data: logsRaw },{ data: rulesRaw },{ data: profilesRaw },{ data: leaveRaw },{ data: projectsRaw }] = await Promise.all([
+  const [logsRes, rulesRes, profilesRes, leaveRes, projectsRes] = await Promise.all([
     supabase.from('time_logs').select('*, profiles(name,role,team)').limit(1000),
     supabase.from('kpi_rules').select('*').limit(1).single(),
     supabase.from('profiles').select('*'),
@@ -18,18 +20,17 @@ export default async function ExecutivePage() {
     supabase.from('projects').select('*,clients(name)'),
   ])
 
-  const logs: TimeLog[] = logsRaw || []
-  const rules: KpiRules = rulesRaw || { daily_hours_threshold:8, billable_target:70, category_targets:{} }
-  const profiles: Profile[] = profilesRaw || []
-  const pendingLeave: LeaveRequest[] = leaveRaw || []
-  const projects = projectsRaw || []
+  const logs: TimeLog[] = logsRes.data || []
+  const rules: KpiRules = rulesRes.data || { id:'', daily_hours_threshold:8, billable_target:70, category_targets:{}, updated_at:'' }
+  const profiles: Profile[] = profilesRes.data || []
+  const pendingLeave = leaveRes.data || []
+  const projects = projectsRes.data || []
 
   const kpis = computeKpis(logs)
   const flags = computeFlags(kpis, rules)
-
-  const today = new Date().toISOString().slice(0,10)
-  const thisWeekStart = new Date(); thisWeekStart.setDate(thisWeekStart.getDate() - thisWeekStart.getDay() + 1)
-  const weekLogs = logs.filter(l => l.date >= thisWeekStart.toISOString().slice(0,10))
+  const weekStart = new Date()
+  weekStart.setDate(weekStart.getDate() - ((weekStart.getDay()+6)%7))
+  const weekLogs = logs.filter(l => l.date >= weekStart.toISOString().slice(0,10))
   const weekKpis = computeKpis(weekLogs)
 
   const teamRows = profiles.map(p => ({
@@ -45,18 +46,20 @@ export default async function ExecutivePage() {
     <div>
       <PageHeader title="Executive Dashboard" subtitle="Company-wide performance summary." />
 
-      <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(180px,1fr))', gap:16, marginBottom:24 }}>
+      <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(175px,1fr))', gap:16, marginBottom:24 }}>
         <KpiCard label="Total Staff" value={profiles.length} />
-        <KpiCard label="Total Hours (All Time)" value={kpis.totalHours} sub={kpis.activeDays+' active days'} />
-        <KpiCard label="This Week Hours" value={weekKpis.totalHours} sub={weekKpis.activeDays+' days active'} />
-        <KpiCard label="Billable %" value={kpis.billablePct+'%'} flag={kpis.billablePct<rules.billable_target?{text:'Below target',level:'amber'}:{text:'On target',level:'green'}} />
+        <KpiCard label="All-Time Hours" value={kpis.totalHours} sub={kpis.activeDays+' active days'} />
+        <KpiCard label="This Week Hours" value={weekKpis.totalHours+'h'} sub={weekKpis.activeDays+' days'} />
+        <KpiCard label="Billable %" value={kpis.billablePct+'%'}
+          flag={kpis.billablePct<rules.billable_target?{text:'Below target',level:'amber'}:{text:'On target',level:'green'}} />
         <KpiCard label="Active Projects" value={projects.filter((p:any)=>p.status==='Active').length} />
-        <KpiCard label="Pending Leave" value={pendingLeave.length} flag={pendingLeave.length>0?{text:'Needs review',level:'amber'}:{text:'All clear',level:'green'}} />
+        <KpiCard label="Pending Leave" value={pendingLeave.length}
+          flag={pendingLeave.length>0?{text:'Needs review',level:'amber'}:{text:'All clear',level:'green'}} />
       </div>
 
       <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:20, marginBottom:20 }}>
         <Card>
-          <CardTitle>Team Performance (All Time)</CardTitle>
+          <CardTitle>Team Performance</CardTitle>
           <table style={{ width:'100%', borderCollapse:'collapse' }}>
             <thead><tr>{['Name','Role','Hours','Billable%','Avg/Day'].map(h=>(
               <th key={h} style={{ textAlign:'left', fontSize:10, fontWeight:700, letterSpacing:'0.08em', textTransform:'uppercase', color:'#9ca3af', padding:'8px 12px', borderBottom:'1px solid #f3f4f6' }}>{h}</th>
@@ -67,7 +70,7 @@ export default async function ExecutivePage() {
                   <td style={{ padding:'9px 12px', fontSize:13, fontWeight:500, borderBottom:'1px solid #f9fafb' }}>{p.name}</td>
                   <td style={{ padding:'9px 12px', fontSize:12, borderBottom:'1px solid #f9fafb' }}><Badge text={p.role} type="gray" /></td>
                   <td style={{ padding:'9px 12px', fontSize:13, fontFamily:'DM Mono,monospace', borderBottom:'1px solid #f9fafb', fontWeight:600 }}>{k.totalHours}h</td>
-                  <td style={{ padding:'9px 12px', fontSize:13, borderBottom:'1px solid #f9fafb', color: k.billablePct>=rules.billable_target?'#059669':'#d97706', fontWeight:600 }}>{k.billablePct}%</td>
+                  <td style={{ padding:'9px 12px', fontSize:13, borderBottom:'1px solid #f9fafb', color:k.billablePct>=rules.billable_target?'#059669':'#d97706', fontWeight:600 }}>{k.billablePct}%</td>
                   <td style={{ padding:'9px 12px', fontSize:13, borderBottom:'1px solid #f9fafb', color:'#6b7280' }}>{k.avgPerDay}h</td>
                 </tr>
               ))}
@@ -102,12 +105,12 @@ export default async function ExecutivePage() {
           </Card>
 
           <Card>
-            <CardTitle>Pending Leave Requests</CardTitle>
-            {pendingLeave.length===0 ? <p style={{ color:'#9ca3af', fontSize:13 }}>No pending leave requests.</p>
-              : pendingLeave.map(l=>(
+            <CardTitle>Pending Leave</CardTitle>
+            {pendingLeave.length===0 ? <p style={{ color:'#9ca3af', fontSize:13 }}>No pending requests.</p>
+              : pendingLeave.map((l:any)=>(
               <div key={l.id} style={{ display:'flex', justifyContent:'space-between', padding:'8px 0', borderBottom:'1px solid #f9fafb', fontSize:13 }}>
                 <span style={{ fontWeight:500 }}>{(l.profiles as any)?.name}</span>
-                <span style={{ color:'#6b7280' }}>{l.leave_type} · {l.days}d</span>
+                <span style={{ color:'#6b7280' }}>{l.leave_type} ? {l.days}d</span>
               </div>
             ))}
           </Card>
@@ -116,7 +119,7 @@ export default async function ExecutivePage() {
 
       <Card>
         <CardTitle>Workforce Composition</CardTitle>
-        <div style={{ display:'flex', gap:24 }}>
+        <div style={{ display:'flex', gap:24, flexWrap:'wrap' }}>
           {roleBreakdown.map(({role,count})=>(
             <div key={role} style={{ textAlign:'center', padding:'16px 24px', background:'#f9fafb', borderRadius:10, minWidth:100 }}>
               <div style={{ fontSize:28, fontWeight:700, fontFamily:'DM Mono,monospace', color:'#6366f1' }}>{count}</div>

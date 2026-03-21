@@ -1,0 +1,8 @@
+{
+  "regions": ["af-south-1"],
+  "functions": {
+    "src/app/api/**": {
+      "regions": ["af-south-1"]
+    }
+  }
+}
