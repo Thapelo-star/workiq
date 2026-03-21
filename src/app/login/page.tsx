@@ -3,12 +3,22 @@ import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 
+const TEAMS = [
+  'Analytical Department',
+  'Lab Management Department',
+  'Metallurgical Department',
+  'Consulting Department',
+  'Admin Department',
+  'Management',
+  'PR Department',
+]
+
 export default function LoginPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [name, setName] = useState('')
   const [role, setRole] = useState('Employee')
-  const [team, setTeam] = useState('')
+  const [team, setTeam] = useState('Analytical Department')
   const [mode, setMode] = useState<'login'|'signup'>('login')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
@@ -34,7 +44,7 @@ export default function LoginPage() {
           if (!existing) {
             const { error: pe } = await supabase.from('profiles').insert({
               id: data.user.id, name: name.trim(), role,
-              team: team.trim() || 'General', hourly_rate: 0, leave_allowance: 21,
+              team: team, hourly_rate: 0, leave_allowance: 21,
             })
             if (pe) { setError(pe.message); return }
           }
@@ -75,12 +85,18 @@ export default function LoginPage() {
                 <div>
                   <label style={lbl}>Role</label>
                   <select style={inp} value={role} onChange={e=>setRole(e.target.value)}>
-                    <option>Employee</option><option>Project Lead</option><option>Manager</option><option>Executive</option><option>Admin</option>
+                    <option>Employee</option>
+                    <option>Project Lead</option>
+                    <option>Manager</option>
+                    <option>Executive</option>
+                    <option>Admin</option>
                   </select>
                 </div>
                 <div>
-                  <label style={lbl}>Team</label>
-                  <input style={inp} value={team} onChange={e=>setTeam(e.target.value)} placeholder="e.g. Admin Department" />
+                  <label style={lbl}>Department / Team</label>
+                  <select style={inp} value={team} onChange={e=>setTeam(e.target.value)}>
+                    {TEAMS.map(t=><option key={t} value={t}>{t}</option>)}
+                  </select>
                 </div>
               </div>
             </>

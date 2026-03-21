@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { LeaveRequest, LeaveBalance, Profile } from '@/lib/types'
 import { Card, CardTitle, PageHeader, Btn, Table, Td, Badge, FormGroup, inputStyle } from '@/components/ui'
@@ -21,52 +21,41 @@ export default function LeavePage() {
   const [dateTo, setDateTo] = useState('')
   const [reason, setReason] = useState('')
 
-  const canApprove = me && ['Manager','Executive','Admin'].includes(me.role)
-  const isAdminDept = me && (me.role === 'Admin' || me.team === 'Admin Department')
-
-  const load = useCallback(async () => {
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return
-    const { data: prof } = await supabase.from('profiles').select('*').eq('id', user.id).single()
-    setMe(prof)
-
-    const { data: myLeave } = await supabase.from('leave_requests')
-      .select('*').eq('user_id', user.id).order('created_at', { ascending:false })
-    setMyRequests(myLeave || [])
-
-    if (canApprove || isAdminDept) {
-      const { data: allLeave } = await supabase.from('leave_requests')
-        .select('*, profiles(name, team, role)').order('created_at', { ascending:false })
-      setTeamRequests(allLeave || [])
-    } else if (prof?.role === 'Manager') {
-      const { data: teamLeave } = await supabase.from('leave_requests')
-        .select('*, profiles(name, team, role)')
-        .order('created_at', { ascending:false })
-      const myTeamLeave = (teamLeave || []).filter((l:any) => l.profiles?.team === prof.team)
-      setTeamRequests(myTeamLeave)
-    }
-
-    const { data: bal } = await supabase.from('leave_balances').select('*').eq('user_id', user.id).single()
-    setBalance(bal)
-  }, [me?.role, me?.team])
-
   useEffect(() => {
     const init = async () => {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
       const { data: prof } = await supabase.from('profiles').select('*').eq('id', user.id).single()
       setMe(prof)
+
+      // My own leave
       const { data: myLeave } = await supabase.from('leave_requests')
         .select('*').eq('user_id', user.id).order('created_at', { ascending:false })
       setMyRequests(myLeave || [])
+
+      // Balance
       const { data: bal } = await supabase.from('leave_balances').select('*').eq('user_id', user.id).single()
       setBalance(bal)
-      const elevated = prof && ['Manager','Executive','Admin'].includes(prof.role)
-      const adminDept = prof && (prof.role === 'Admin' || prof.team === 'Admin Department')
-      if (elevated || adminDept) {
-        const { data: allLeave } = await supabase.from('leave_requests')
-          .select('*, profiles(name, team, role)').order('created_at', { ascending:false })
-        setTeamRequests(allLeave || [])
+
+      // Team requests based on role/team
+      const isAdmin = prof?.role === 'Admin'
+      const isExecutive = prof?.role === 'Executive' || prof?.team === 'Executive'
+      const isAdminDept = prof?.team === 'Admin Department'
+      const isManager = prof?.role === 'Manager'
+
+      if (isAdmin || isExecutive || isAdminDept) {
+        // See ALL leave requests
+        const { data: all } = await supabase.from('leave_requests')
+          .select('*, profiles(name, team, role)')
+          .order('created_at', { ascending:false })
+        setTeamRequests(all || [])
+      } else if (isManager) {
+        // See only their team's leave
+        const { data: all } = await supabase.from('leave_requests')
+          .select('*, profiles(name, team, role)')
+          .order('created_at', { ascending:false })
+        const filtered = (all || []).filter((l:any) => l.profiles?.team === prof?.team)
+        setTeamRequests(filtered)
       }
     }
     init()
@@ -81,30 +70,25 @@ export default function LeavePage() {
   async function applyLeave() {
     if (!dateFrom || !dateTo) { setMsg('Please select dates.'); return }
     const { data: { user } } = await supabase.auth.getUser()
-    if (!user) { setMsg('Not logged in.'); return }
+    if (!user) return
     const days = calcDays(dateFrom, dateTo)
     const { error } = await supabase.from('leave_requests').insert({
-      user_id: user.id,
-      leave_type: leaveType,
-      date_from: dateFrom,
-      date_to: dateTo,
-      days,
-      reason,
-      status: 'Pending',
+      user_id: user.id, leave_type: leaveType,
+      date_from: dateFrom, date_to: dateTo,
+      days, reason, status: 'Pending',
     })
     if (error) { setMsg('Error: ' + error.message); return }
     await supabase.from('notifications').insert({
-      user_id: user.id,
-      title: 'Leave Application Submitted',
+      user_id: user.id, title: 'Leave Application Submitted',
       body: leaveType + ' leave for ' + days + ' day(s) from ' + fmtDate(dateFrom) + ' is pending approval.',
-      type: 'info',
-      link: '/dashboard/leave'
+      type: 'info', link: '/dashboard/leave'
     })
-    setMsg('Leave application submitted successfully.')
-    setDateFrom(''); setDateTo(''); setReason(''); setTab('my')
+    setMsg('Leave application submitted.')
+    setDateFrom(''); setDateTo(''); setReason('')
     const { data: myLeave } = await supabase.from('leave_requests')
       .select('*').eq('user_id', user.id).order('created_at', { ascending:false })
     setMyRequests(myLeave || [])
+    setTab('my')
     setTimeout(() => setMsg(''), 4000)
   }
 
@@ -112,30 +96,41 @@ export default function LeavePage() {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
     const req = teamRequests.find(r => r.id === id)
-    const { error } = await supabase.from('leave_requests').update({
+    await supabase.from('leave_requests').update({
       status: action, reviewed_by: user.id, reviewed_at: new Date().toISOString()
     }).eq('id', id)
-    if (error) { setMsg('Error: ' + error.message); return }
     if (req && action === 'Approved') {
       const { data: existing } = await supabase.from('leave_balances').select('*').eq('user_id', req.user_id).single()
       const field = req.leave_type === 'Sick' ? 'sick_used' : 'annual_used'
       if (existing) {
         await supabase.from('leave_balances').update({ [field]: (existing[field]||0) + req.days }).eq('user_id', req.user_id)
       } else {
-        await supabase.from('leave_balances').insert({ user_id:req.user_id, annual_used:req.leave_type!=='Sick'?req.days:0, sick_used:req.leave_type==='Sick'?req.days:0 })
+        await supabase.from('leave_balances').insert({
+          user_id: req.user_id,
+          annual_used: req.leave_type !== 'Sick' ? req.days : 0,
+          sick_used: req.leave_type === 'Sick' ? req.days : 0
+        })
       }
       await supabase.from('notifications').insert({
         user_id: req.user_id,
         title: 'Leave ' + action,
         body: req.leave_type + ' leave from ' + fmtDate(req.date_from) + ' to ' + fmtDate(req.date_to) + ' has been ' + action.toLowerCase() + '.',
-        type: action==='Approved' ? 'success' : 'warning',
+        type: action === 'Approved' ? 'success' : 'warning',
         link: '/dashboard/leave'
       })
     }
     setMsg('Leave ' + action.toLowerCase() + '.')
-    const { data: allLeave } = await supabase.from('leave_requests')
+    const { data: updated } = await supabase.from('leave_requests')
       .select('*, profiles(name, team, role)').order('created_at', { ascending:false })
-    setTeamRequests(allLeave || [])
+    const isAdmin = me?.role === 'Admin'
+    const isExecutive = me?.role === 'Executive' || me?.team === 'Executive'
+    const isAdminDept = me?.team === 'Admin Department'
+    const isManager = me?.role === 'Manager'
+    if (isAdmin || isExecutive || isAdminDept) {
+      setTeamRequests(updated || [])
+    } else if (isManager) {
+      setTeamRequests((updated || []).filter((l:any) => l.profiles?.team === me?.team))
+    }
     setTimeout(() => setMsg(''), 3000)
   }
 
@@ -143,7 +138,21 @@ export default function LeavePage() {
   const annualUsed = balance?.annual_used || 0
   const sickUsed = balance?.sick_used || 0
   const remaining = allowance - annualUsed
-  const showTeamTab = me && ['Manager','Executive','Admin'].includes(me.role) || (me?.team === 'Admin Department')
+
+  const isAdmin = me?.role === 'Admin'
+  const isExecutive = me?.role === 'Executive' || me?.team === 'Executive'
+  const isAdminDept = me?.team === 'Admin Department'
+  const isManager = me?.role === 'Manager'
+  const canApprove = isAdmin || isExecutive || isManager
+  const canViewTeam = isAdmin || isExecutive || isAdminDept || isManager
+  const viewOnly = isAdminDept && !canApprove
+
+  const teamLabel = (() => {
+    if (isAdmin || isExecutive) return 'All Leave Requests'
+    if (isAdminDept) return 'All Leave Requests (View Only)'
+    if (isManager) return me?.team + ' ? Leave Requests'
+    return 'Team Requests'
+  })()
 
   return (
     <div>
@@ -175,7 +184,7 @@ export default function LeavePage() {
         {[
           { key:'my', label:'My Leave History' },
           { key:'apply', label:'Apply for Leave' },
-          ...(showTeamTab ? [{ key:'team', label:'Team Requests' }] : []),
+          ...(canViewTeam ? [{ key:'team', label: isManager ? (me?.team + ' Requests') : 'All Requests' }] : []),
         ].map(t => (
           <div key={t.key} onClick={() => setTab(t.key as any)}
             style={{ padding:'8px 18px', fontSize:13, cursor:'pointer',
@@ -192,7 +201,7 @@ export default function LeavePage() {
           <CardTitle>My Leave History</CardTitle>
           {myRequests.length === 0 ? (
             <div style={{ textAlign:'center', padding:40, color:'#a0a8c0', fontSize:13 }}>
-              No leave applications yet. Click "Apply for Leave" to submit one.
+              No leave applications yet. Click Apply for Leave to submit one.
             </div>
           ) : (
             <Table heads={['Type','From','To','Days','Status']} empty={false}>
@@ -230,7 +239,7 @@ export default function LeavePage() {
             )}
             <div style={{ gridColumn:'1/-1' }}>
               <FormGroup label="Reason (optional)">
-                <textarea style={{ ...inputStyle, minHeight:72, resize:'vertical' }} value={reason} onChange={e=>setReason(e.target.value)} placeholder="Brief reason for leave..." />
+                <textarea style={{ ...inputStyle, minHeight:72, resize:'vertical' }} value={reason} onChange={e=>setReason(e.target.value)} placeholder="Brief reason..." />
               </FormGroup>
             </div>
           </div>
@@ -238,19 +247,22 @@ export default function LeavePage() {
         </Card>
       )}
 
-      {tab === 'team' && showTeamTab && (
+      {tab === 'team' && canViewTeam && (
         <Card>
-          <CardTitle>
-            {me?.role === 'Admin' || me?.team === 'Admin Department' ? 'All Leave Requests' : 'Team Leave Requests'}
-          </CardTitle>
+          <CardTitle>{teamLabel}</CardTitle>
+          {viewOnly && (
+            <div style={{ marginBottom:12, padding:'8px 14px', background:'#fef3c7', borderRadius:8, fontSize:12, color:'#92400e' }}>
+              View only ? Admin Department can see all requests but cannot approve or reject.
+            </div>
+          )}
           {teamRequests.length === 0 ? (
             <div style={{ textAlign:'center', padding:40, color:'#a0a8c0', fontSize:13 }}>No leave requests found.</div>
           ) : (
-            <Table heads={['Person','Team','Type','From','To','Days','Status','']} empty={false}>
+            <Table heads={['Person','Department','Type','From','To','Days','Status','']} empty={false}>
               {teamRequests.map(r => (
                 <tr key={r.id}>
-                  <Td style={{ fontWeight:500 }}>{r.profiles?.name||'?'}</Td>
-                  <Td style={{ fontSize:12, color:'#6b7280' }}>{r.profiles?.team||'?'}</Td>
+                  <Td style={{ fontWeight:500 }}>{(r.profiles as any)?.name||'?'}</Td>
+                  <Td style={{ fontSize:12, color:'#6b7280' }}>{(r.profiles as any)?.team||'?'}</Td>
                   <Td><Badge text={r.leave_type} type="gray" /></Td>
                   <Td style={{ fontSize:12 }}>{fmtDate(r.date_from)}</Td>
                   <Td style={{ fontSize:12 }}>{fmtDate(r.date_to)}</Td>
@@ -263,8 +275,8 @@ export default function LeavePage() {
                         <Btn small danger onClick={()=>reviewLeave(r.id,'Rejected')}>Reject</Btn>
                       </div>
                     )}
-                    {isAdminDept && !canApprove && r.status === 'Pending' && (
-                      <span style={{ fontSize:11, color:'#a0a8c0' }}>View only</span>
+                    {viewOnly && (
+                      <span style={{ fontSize:11, color:'#a0a8c0', fontStyle:'italic' }}>view only</span>
                     )}
                   </Td>
                 </tr>
