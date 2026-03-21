@@ -67,9 +67,10 @@ function SidebarContent({ profile, pathname, onNav }: { profile: Profile; pathna
   }
   return (
     <div style={{ display:'flex', flexDirection:'column', height:'100%', background:'#1e2140' }}>
-      <div style={{ padding:'20px 18px 16px', borderBottom:'1px solid rgba(255,255,255,0.06)' }}>
-        <div style={{ fontWeight:800, fontSize:19, letterSpacing:-0.5, color:'#fff' }}>Work<span style={{ color:'#818cf8' }}>IQ</span></div>
-        <div style={{ fontSize:11, color:'rgba(168,176,208,0.7)', marginTop:2 }}>Work Intelligence System</div>
+      <div style={{ padding:'16px 18px', borderBottom:'1px solid rgba(255,255,255,0.06)', display:'flex', flexDirection:'column', alignItems:'center' }}>
+        <img src='/cms-logo.png' alt='CM Solutions' style={{ width:100, objectFit:'contain', marginBottom:10 }} />
+        <div style={{ fontWeight:800, fontSize:16, letterSpacing:-0.5, color:'#fff', textAlign:'center' }}>Work<span style={{ color:'#b4b93c' }}>IQ</span></div>
+        <div style={{ fontSize:9, color:'rgba(168,176,208,0.5)', marginTop:2, letterSpacing:'0.08em', textTransform:'uppercase' }}>Work Intelligence System</div>
       </div>
       <div style={{ flex:1, overflowY:'auto', padding:'8px 10px', scrollbarWidth:'none' }}>
         {groups.map(group => (
@@ -146,7 +147,7 @@ export default function AppShell({ profile, children }: { profile: Profile; chil
             <path d="M4 6h16M4 12h16M4 18h16" stroke="#6366f1" strokeWidth="2" strokeLinecap="round"/>
           </svg>
         </button>
-        {isMobile && <div style={{ fontWeight:800, fontSize:17, letterSpacing:-0.5, color:'#1a1d2e' }}>Work<span style={{ color:'#6366f1' }}>IQ</span></div>}
+        {isMobile && <div style={{ fontWeight:800, fontSize:17, letterSpacing:-0.5, color:'#1a1d2e' }}>Work<span style={{ color:'#b4b93c' }}>IQ</span></div>}
         <div style={{ flex:1 }} />
         <NotificationBell />
         {!isMobile && (
@@ -201,3 +202,5 @@ export default function AppShell({ profile, children }: { profile: Profile; chil
     </div>
   )
 }
+
+

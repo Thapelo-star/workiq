@@ -6,6 +6,16 @@ import { Card, CardTitle, PageHeader, FormGroup, inputStyle } from '@/components
 
 const COLORS = ['#6366f1','#0ea5e9','#059669','#d97706','#7c3aed','#dc2626','#f472b6','#34d399','#fb923c','#38bdf8','#a78bfa']
 
+const TEAM_NAMES = [
+  'Analytical Department',
+  'Lab Management Department',
+  'Metallurgical Department',
+  'Consulting Department',
+  'Admin Department',
+  'Management',
+  'PR Department',
+]
+
 function getWeeks(logs: TimeLog[]) {
   if (!logs.length) return []
   const byWeek: Record<string, { total: number; billable: number }> = {}
@@ -177,10 +187,10 @@ export default function TrendsPage() {
     if (!isElevated || scope === 'mine') return allLogs.filter(l => l.user_id === me?.id)
     if (scope === 'company') return allLogs
     if (scope === 'user') return selectedUser ? allLogs.filter(l => l.user_id === selectedUser) : []
-    if (scope === 'team') {
-      const ids = allProfiles.filter(p => p.team === selectedTeam).map(p => p.id)
-      return selectedTeam ? allLogs.filter(l => ids.includes(l.user_id)) : []
-    }
+    if (scope === 'team') return selectedTeam ? allLogs.filter(l => {
+      const prof = allProfiles.find(p => p.id === l.user_id)
+      return prof?.team === selectedTeam
+    }) : []
     return allLogs
   })()
 
@@ -191,14 +201,13 @@ export default function TrendsPage() {
   const billableHours = filteredLogs.filter(l=>BILLABLE_CATEGORIES.includes(l.category as any)).reduce((s,l)=>s+Number(l.hours),0)
   const billablePct = totalHours > 0 ? Math.round((billableHours/totalHours)*100) : 0
   const avgWeekly = weeks.length > 0 ? parseFloat((weeks.reduce((s,w)=>s+w.total,0)/weeks.length).toFixed(1)) : 0
-  const uniqueTeams = Array.from(new Set(allProfiles.map(p=>p.team).filter(Boolean)))
   const selectedUserProfile = allProfiles.find(p=>p.id===selectedUser)
 
   const scopeLabel = (() => {
     if (!isElevated || scope==='mine') return 'My Trends'
     if (scope==='company') return 'Company Overview'
     if (scope==='user') return selectedUserProfile?.name || 'Select a person'
-    if (scope==='team') return selectedTeam ? selectedTeam+' Team' : 'Select a team'
+    if (scope==='team') return selectedTeam ? selectedTeam : 'Select a team'
     return 'Trends'
   })()
 
@@ -229,19 +238,21 @@ export default function TrendsPage() {
                 ))}
               </div>
             </FormGroup>
+
             {scope==='user' && (
               <FormGroup label="Select Person">
-                <select style={{ ...inputStyle, width:200 }} value={selectedUser} onChange={e=>setSelectedUser(e.target.value)}>
+                <select style={{ ...inputStyle, width:220 }} value={selectedUser} onChange={e=>setSelectedUser(e.target.value)}>
                   <option value="">Choose person...</option>
                   {allProfiles.map(p=><option key={p.id} value={p.id}>{p.name} ({p.role})</option>)}
                 </select>
               </FormGroup>
             )}
+
             {scope==='team' && (
               <FormGroup label="Select Team">
-                <select style={{ ...inputStyle, width:200 }} value={selectedTeam} onChange={e=>setSelectedTeam(e.target.value)}>
+                <select style={{ ...inputStyle, width:220 }} value={selectedTeam} onChange={e=>setSelectedTeam(e.target.value)}>
                   <option value="">Choose team...</option>
-                  {uniqueTeams.map(t=><option key={t}>{t}</option>)}
+                  {TEAM_NAMES.map(t=><option key={t} value={t}>{t}</option>)}
                 </select>
               </FormGroup>
             )}
@@ -259,17 +270,20 @@ export default function TrendsPage() {
           {scope==='user' && selectedUserProfile && (
             <div style={{ fontSize:12, color:'#6b7280' }}>{selectedUserProfile.role} ? {selectedUserProfile.team}</div>
           )}
+          {scope==='team' && selectedTeam && (
+            <div style={{ fontSize:12, color:'#6b7280' }}>{allProfiles.filter(p=>p.team===selectedTeam).length} people in this team</div>
+          )}
         </div>
       </div>
 
       <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(155px,1fr))', gap:14, marginBottom:24 }}>
         {[
-          { label:'Total Hours',   value:totalHours.toFixed(1)+'h',  color:'#6366f1' },
-          { label:'Billable Hours',value:billableHours.toFixed(1)+'h',color:'#059669' },
-          { label:'Billable %',    value:billablePct+'%',             color:billablePct>=70?'#059669':'#d97706' },
-          { label:'Avg / Week',    value:avgWeekly+'h',               color:'#0ea5e9' },
-          { label:'Log Entries',   value:filteredLogs.length.toString(),color:'#7c3aed' },
-          { label:'Active Weeks',  value:weeks.length.toString(),     color:'#d97706' },
+          { label:'Total Hours',    value:totalHours.toFixed(1)+'h',  color:'#6366f1' },
+          { label:'Billable Hours', value:billableHours.toFixed(1)+'h',color:'#059669' },
+          { label:'Billable %',     value:billablePct+'%',             color:billablePct>=70?'#059669':'#d97706' },
+          { label:'Avg / Week',     value:avgWeekly+'h',               color:'#0ea5e9' },
+          { label:'Log Entries',    value:filteredLogs.length.toString(),color:'#7c3aed' },
+          { label:'Active Weeks',   value:weeks.length.toString(),     color:'#d97706' },
         ].map(s => (
           <div key={s.label} style={{ background:'#fff', border:'1px solid #e8eaf2', borderRadius:12, padding:'16px 18px', position:'relative', overflow:'hidden', boxShadow:'0 1px 3px rgba(30,33,64,0.05)' }}>
             <div style={{ position:'absolute', top:0, left:0, right:0, height:3, background:s.color, borderRadius:'12px 12px 0 0' }} />
@@ -393,4 +407,3 @@ export default function TrendsPage() {
     </div>
   )
 }
-

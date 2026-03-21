@@ -1,16 +1,16 @@
-﻿import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 
 export async function POST(req: NextRequest) {
   try {
     const { kpis, rules, userName, role } = await req.json()
-    const catLines = Object.entries(kpis.catMap).map(function(e) { return e[0] + ': ' + e[1] + 'h' }).join('\n')
-    const projLines = Object.entries(kpis.projMap).map(function(e) { return e[0] + ': ' + e[1] + 'h' }).join('\n')
-    const targetLines = Object.entries(rules.category_targets || {}).map(function(e) { return e[0] + ': ' + e[1] + 'h' }).join('\n')
+    const catLines = Object.entries(kpis.catMap).map(function(e: any) { return e[0] + ': ' + e[1] + 'h' }).join('\n')
+    const projLines = Object.entries(kpis.projMap).map(function(e: any) { return e[0] + ': ' + e[1] + 'h' }).join('\n')
+    const targetLines = Object.entries(rules.category_targets || {}).map(function(e: any) { return e[0] + ': ' + e[1] + 'h' }).join('\n')
     const topProj = kpis.topProject ? kpis.topProject[0] + ' (' + kpis.topProject[1] + 'h)' : 'none'
     const topCat = kpis.topCategory ? kpis.topCategory[0] + ' (' + kpis.topCategory[1] + 'h)' : 'none'
 
     const prompt = [
-      'You are a work intelligence analyst. Analyse this activity data and return exactly 8 insights as a JSON array.',
+      'You are a work intelligence analyst for CM Solutions, a metallurgical consultancy. Analyse this activity data and return exactly 8 insights as a JSON array.',
       'Each insight must have: id (i1-i8), severity (High/Med/Low), title (max 8 words), detail (2-3 sentences using actual numbers), related (metric or category).',
       'Return ONLY a valid JSON array. No markdown. No explanation.',
       '',
@@ -48,7 +48,7 @@ export async function POST(req: NextRequest) {
 
     if (!response.ok) {
       const errText = await response.text()
-      return NextResponse.json({ error: errText }, { status: 500 })
+      return NextResponse.json({ error: 'OpenAI API error: ' + errText }, { status: 500 })
     }
 
     const data = await response.json()
