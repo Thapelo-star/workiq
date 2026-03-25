@@ -88,11 +88,7 @@ export default function LeavePage() {
     if (isAdmin || isExecutive || isAdminDept || isManager) {
       const { data: allLeave, error: allErr } = await supabase
         .from('leave_requests')
-        .select(
-          *,
-          requester:profiles!leave_requests_user_id_fkey(id, name, team, role),
-          reviewer:profiles!leave_requests_reviewed_by_fkey(id, name, team, role)
-        )
+        .select('*, requester:profiles!leave_requests_user_id_fkey(id, name, team, role), reviewer:profiles!leave_requests_reviewed_by_fkey(id, name, team, role)')
         .order('created_at', { ascending: false })
 
       if (allErr) {
@@ -490,3 +486,4 @@ export default function LeavePage() {
     </div>
   )
 }
+
