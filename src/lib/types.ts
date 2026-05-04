@@ -4,12 +4,12 @@ export type Category =
   | 'Development' | 'Design' | 'Meetings'
   | 'Research' | 'Admin' | 'Client' | 'Training'
   | 'Test Work' | 'Test Work Admin' | 'Test Work Setup' | 'Consulting' | 'Mine Visit'
-  | 'Events' | 'Content Development' | 'Other'
+  | 'Events' | 'Content Development' | 'Social Media Tracking and Monitoring' | 'Other'
 
 export const CATEGORIES: Category[] = [
   'Development','Design','Meetings','Research','Admin','Client','Training',
   'Test Work','Test Work Admin','Test Work Setup','Consulting','Mine Visit',
-  'Events','Content Development','Other',
+  'Events','Content Development','Social Media Tracking and Monitoring','Other',
 ]
 
 export const BILLABLE_CATEGORIES: Category[] = [
