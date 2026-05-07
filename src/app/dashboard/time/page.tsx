@@ -6,13 +6,9 @@ import { fmtDate, todayStr } from '@/lib/kpi'
 import { Card, CardTitle, PageHeader, Btn, Badge, Table, Td, FormGroup, inputStyle } from '@/components/ui'
 
 function splitStoredHours(total: number) {
-  const safe = Number(total || 0)
-  const wholeHours = Math.floor(safe)
-  const minutes = Math.round((safe - wholeHours) * 60)
-
-  if (minutes === 60) {
-    return { hours: String(wholeHours + 1), minutes: '0' }
-  }
+  const totalMinutes = Math.round(Number(total || 0) * 60)
+  const wholeHours = Math.floor(totalMinutes / 60)
+  const minutes = totalMinutes % 60
 
   return {
     hours: String(wholeHours),
@@ -27,17 +23,11 @@ function buildStoredHours(hoursText: string, minutesText: string) {
 }
 
 function formatDuration(total: number) {
-  const safe = Number(total || 0)
-  const hrs = Math.floor(safe)
-  let mins = Math.round((safe - hrs) * 60)
+  const totalMinutes = Math.round(Number(total || 0) * 60)
+  const hrs = Math.floor(totalMinutes / 60)
+  const mins = totalMinutes % 60
 
-  let finalHours = hrs
-  if (mins === 60) {
-    finalHours += 1
-    mins = 0
-  }
-
-  return mins > 0 ? `${finalHours}h ${String(mins).padStart(2, '0')}m` : `${finalHours}h`
+  return mins > 0 ? `${hrs}h ${String(mins).padStart(2, '0')}m` : `${hrs}h`
 }
 
 export default function TimePage() {
@@ -404,3 +394,4 @@ export default function TimePage() {
     </div>
   )
 }
+
