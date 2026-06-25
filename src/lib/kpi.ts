@@ -1,4 +1,4 @@
-﻿import { TimeLog, KpiData, BILLABLE_CATEGORIES, KpiRules, Insight } from './types'
+import { TimeLog, KpiData, BILLABLE_CATEGORIES, KpiRules, Insight } from './types'
 
 export function computeKpis(logs: TimeLog[]): KpiData {
   const total = logs.reduce((s, l) => s + Number(l.hours), 0)
@@ -104,7 +104,9 @@ export function generateInsights(kpis: KpiData, rules: KpiRules, variant: number
 }
 
 export function todayStr() {
-  return new Date().toISOString().slice(0, 10)
+  const now = new Date()
+  const local = new Date(now.getTime() - now.getTimezoneOffset() * 60000)
+  return local.toISOString().slice(0, 10)
 }
 
 export function fmtDate(d: string) {
@@ -112,3 +114,4 @@ export function fmtDate(d: string) {
   const parts = d.split('-')
   return parts[2] + '/' + parts[1] + '/' + parts[0]
 }
+

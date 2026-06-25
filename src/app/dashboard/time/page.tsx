@@ -319,6 +319,21 @@ export default function TimePage() {
         <Card accent={editingId ? '#d97706' : '#5b5ce2'}>
           <CardTitle>{editingId ? 'Edit Time Log' : 'Add Time Log'}</CardTitle>
 
+          <div
+            style={{
+              marginBottom: 14,
+              padding: '10px 12px',
+              borderRadius: 12,
+              background: '#f8fafc',
+              border: '1px solid #e6ebf3',
+              color: '#5f6b85',
+              fontSize: 13,
+              fontWeight: 600,
+            }}
+          >
+            Logging for: <span style={{ color: '#141b2d', fontWeight: 800 }}>{fmtDate(date)}</span>
+          </div>
+
           {editingId && (
             <div style={{ marginBottom: 14, padding: '10px 12px', borderRadius: 12, background: '#fff7ed', border: '1px solid #fed7aa', color: '#9a3412', fontSize: 13, fontWeight: 600 }}>
               You are editing an existing time log.
@@ -509,3 +524,4 @@ export default function TimePage() {
     </div>
   )
 }
+
