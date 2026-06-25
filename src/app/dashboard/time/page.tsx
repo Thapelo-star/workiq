@@ -30,6 +30,31 @@ function formatDuration(total: number) {
   return mins > 0 ? `${hrs}h ${String(mins).padStart(2, '0')}m` : `${hrs}h`
 }
 
+function StatCard(props: { label: string; value: string; sub?: string; color: string }) {
+  return (
+    <div
+      style={{
+        background: '#fff',
+        border: '1px solid #e6ebf3',
+        borderRadius: 16,
+        padding: '16px 18px',
+        boxShadow: '0 4px 14px rgba(20,27,45,0.04)',
+        position: 'relative',
+        overflow: 'hidden',
+      }}
+    >
+      <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 3, background: props.color }} />
+      <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: '0.12em', textTransform: 'uppercase', color: '#98a2b3', marginBottom: 8 }}>
+        {props.label}
+      </div>
+      <div style={{ fontSize: 24, fontWeight: 900, fontFamily: 'DM Mono,monospace', color: '#141b2d', lineHeight: 1.1 }}>
+        {props.value}
+      </div>
+      {props.sub && <div style={{ fontSize: 12, color: '#6b7280', marginTop: 7 }}>{props.sub}</div>}
+    </div>
+  )
+}
+
 export default function TimePage() {
   const supabase = createClient()
   const [profile, setProfile] = useState<Profile | null>(null)
@@ -68,11 +93,14 @@ export default function TimePage() {
 
     let q = supabase
       .from('time_logs')
-      .select('*, profiles(name)')
+      .select('*, profiles(name,role,team)')
       .order('date', { ascending: false })
-      .limit(300)
+      .limit(500)
 
-    if (prof?.role === 'Employee') q = q.eq('user_id', user.id)
+    if (prof?.role === 'Employee') {
+      q = q.eq('user_id', user.id)
+    }
+
     if (fFrom) q = q.gte('date', fFrom)
     if (fTo) q = q.lte('date', fTo)
     if (fCat) q = q.eq('category', fCat)
@@ -204,18 +232,98 @@ export default function TimePage() {
     fetchLogs()
   }
 
-  const canManage = (log: TimeLog) => profile?.role !== 'Executive'
+  function escapeCsv(value: unknown) {
+    const text = String(value ?? '')
+    if (text.includes(',') || text.includes('"') || text.includes('\n')) {
+      return '"' + text.replace(/"/g, '""') + '"'
+    }
+    return text
+  }
+
+  function exportLogs() {
+    if (!logs.length) {
+      setMsg('There are no logs to export.')
+      setMsgType('err')
+      return
+    }
+
+    const headers = [
+      'Date',
+      'Person',
+      'Team',
+      'Project',
+      'Category',
+      'Task',
+      'Hours',
+      'Minutes',
+      'Duration',
+      'Notes',
+    ]
+
+    const rows = logs.map(log => {
+      const parts = splitStoredHours(log.hours)
+      return [
+        log.date,
+        (log.profiles as any)?.name || '',
+        (log.profiles as any)?.team || '',
+        log.project,
+        log.category,
+        log.task,
+        parts.hours,
+        parts.minutes,
+        formatDuration(log.hours),
+        log.notes || '',
+      ].map(escapeCsv).join(',')
+    })
+
+    const csv = [headers.join(','), ...rows].join('\r\n')
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+    const url = window.URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    const stamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-')
+
+    link.href = url
+    link.setAttribute('download', `workiq_logs_${stamp}.csv`)
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    window.URL.revokeObjectURL(url)
+  }
+
+  const canManage = profile?.role !== 'Executive'
+  const canExport = ['Manager', 'Admin', 'Executive'].includes(profile?.role || '')
+
+  const totalMinutes = logs.reduce((sum, log) => sum + Math.round(Number(log.hours || 0) * 60), 0)
+  const totalHoursDisplay = formatDuration(totalMinutes / 60)
+  const uniqueProjects = Array.from(new Set(logs.map(l => l.project).filter(Boolean))).length
+  const uniqueCategories = Array.from(new Set(logs.map(l => l.category).filter(Boolean))).length
+  const activeDays = Array.from(new Set(logs.map(l => l.date))).length
 
   return (
     <div>
       <PageHeader
         title="Time Capture"
-        subtitle="Log your work hours against projects and categories."
+        subtitle="Log work clearly, manage mistakes quickly, and keep a clean time history."
+        action={canExport ? <Btn onClick={exportLogs}>Export Logs</Btn> : undefined}
       />
 
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(180px,1fr))', gap: 14, marginBottom: 22 }}>
+        <StatCard label="Log Entries" value={String(logs.length)} color="#5b5ce2" />
+        <StatCard label="Total Logged" value={totalHoursDisplay} sub="Current filtered view" color="#0ea5e9" />
+        <StatCard label="Projects" value={String(uniqueProjects)} sub="Distinct projects" color="#059669" />
+        <StatCard label="Categories" value={String(uniqueCategories)} sub="Distinct categories" color="#d97706" />
+        <StatCard label="Active Days" value={String(activeDays)} sub="Days with logs" color="#7c3aed" />
+      </div>
+
       <div style={{ display: 'grid', gridTemplateColumns: '390px 1fr', gap: 20, alignItems: 'start' }}>
-        <Card>
+        <Card accent={editingId ? '#d97706' : '#5b5ce2'}>
           <CardTitle>{editingId ? 'Edit Time Log' : 'Add Time Log'}</CardTitle>
+
+          {editingId && (
+            <div style={{ marginBottom: 14, padding: '10px 12px', borderRadius: 12, background: '#fff7ed', border: '1px solid #fed7aa', color: '#9a3412', fontSize: 13, fontWeight: 600 }}>
+              You are editing an existing time log.
+            </div>
+          )}
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
             <FormGroup label="Date *">
@@ -228,7 +336,7 @@ export default function TimePage() {
             </FormGroup>
 
             <div>
-              <div style={{ fontSize: 12, fontWeight: 600, color: '#4b5563', marginBottom: 6 }}>Duration *</div>
+              <div style={{ fontSize: 12, fontWeight: 700, color: '#5f6b85', marginBottom: 7 }}>Duration *</div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
                 <input
                   style={inputStyle}
@@ -253,18 +361,18 @@ export default function TimePage() {
               </div>
             </div>
 
-            <div style={{ gridColumn: '1/-1' }}>
+            <div style={{ gridColumn: '1 / -1' }}>
               <FormGroup label="Project *">
                 <input
                   style={inputStyle}
                   value={project}
                   onChange={e => setProject(e.target.value)}
-                  placeholder="e.g. Alpha Platform"
+                  placeholder="e.g. WorkIQ Internal, Campaign, Client Project"
                 />
               </FormGroup>
             </div>
 
-            <div style={{ gridColumn: '1/-1' }}>
+            <div style={{ gridColumn: '1 / -1' }}>
               <FormGroup label="Category *">
                 <select
                   style={inputStyle}
@@ -277,47 +385,47 @@ export default function TimePage() {
               </FormGroup>
             </div>
 
-            <div style={{ gridColumn: '1/-1' }}>
+            <div style={{ gridColumn: '1 / -1' }}>
               <FormGroup label="Task Description *">
                 <input
                   style={inputStyle}
                   value={task}
                   onChange={e => setTask(e.target.value)}
-                  placeholder="What did you work on?"
+                  placeholder="What exactly did you work on?"
                 />
               </FormGroup>
             </div>
 
-            <div style={{ gridColumn: '1/-1' }}>
+            <div style={{ gridColumn: '1 / -1' }}>
               <FormGroup label="Notes (optional)">
                 <textarea
-                  style={{ ...inputStyle, resize: 'vertical', minHeight: 64 }}
+                  style={{ ...inputStyle, resize: 'vertical', minHeight: 84 }}
                   value={notes}
                   onChange={e => setNotes(e.target.value)}
-                  placeholder="Any additional context..."
+                  placeholder="Add any useful context..."
                 />
               </FormGroup>
             </div>
           </div>
 
-          <div style={{ marginTop: 16, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <div style={{ marginTop: 18, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             <Btn primary onClick={saveLog} disabled={loading}>
               {loading ? (editingId ? 'Updating...' : 'Saving...') : (editingId ? 'Update Log' : 'Save Log')}
             </Btn>
-            <Btn onClick={resetForm}>
-              {editingId ? 'Cancel Edit' : 'Clear'}
-            </Btn>
+            <Btn onClick={resetForm}>{editingId ? 'Cancel Edit' : 'Clear'}</Btn>
           </div>
 
           {msg && (
             <div
               style={{
-                marginTop: 10,
+                marginTop: 12,
                 fontSize: 13,
-                color: msgType === 'ok' ? '#1a7f5a' : '#c0392b',
-                padding: '6px 10px',
-                borderRadius: 6,
-                background: msgType === 'ok' ? '#e6f4ee' : '#fdecea'
+                color: msgType === 'ok' ? '#166534' : '#b91c1c',
+                padding: '10px 12px',
+                borderRadius: 12,
+                background: msgType === 'ok' ? '#dcfce7' : '#fee2e2',
+                border: msgType === 'ok' ? '1px solid #bbf7d0' : '1px solid #fecaca',
+                fontWeight: 600,
               }}
             >
               {msg}
@@ -325,73 +433,79 @@ export default function TimePage() {
           )}
         </Card>
 
-        <Card>
-          <CardTitle>Log History</CardTitle>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+          <Card>
+            <CardTitle>Filters</CardTitle>
 
-          <div style={{ display: 'flex', gap: 10, marginBottom: 16, flexWrap: 'wrap', alignItems: 'flex-end' }}>
-            <FormGroup label="From">
-              <input
-                style={{ ...inputStyle, width: 130 }}
-                type="date"
-                value={fFrom}
-                onChange={e => setFFrom(e.target.value)}
-              />
-            </FormGroup>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(150px,1fr))', gap: 12, alignItems: 'end' }}>
+              <FormGroup label="From">
+                <input
+                  style={inputStyle}
+                  type="date"
+                  value={fFrom}
+                  onChange={e => setFFrom(e.target.value)}
+                />
+              </FormGroup>
 
-            <FormGroup label="To">
-              <input
-                style={{ ...inputStyle, width: 130 }}
-                type="date"
-                value={fTo}
-                onChange={e => setFTo(e.target.value)}
-              />
-            </FormGroup>
+              <FormGroup label="To">
+                <input
+                  style={inputStyle}
+                  type="date"
+                  value={fTo}
+                  onChange={e => setFTo(e.target.value)}
+                />
+              </FormGroup>
 
-            <FormGroup label="Category">
-              <select
-                style={{ ...inputStyle, width: 170 }}
-                value={fCat}
-                onChange={e => setFCat(e.target.value)}
-              >
-                <option value="">All</option>
-                {CATEGORIES.map(c => <option key={c}>{c}</option>)}
-              </select>
-            </FormGroup>
+              <FormGroup label="Category">
+                <select
+                  style={inputStyle}
+                  value={fCat}
+                  onChange={e => setFCat(e.target.value)}
+                >
+                  <option value="">All</option>
+                  {CATEGORIES.map(c => <option key={c}>{c}</option>)}
+                </select>
+              </FormGroup>
 
-            <FormGroup label="Project">
-              <input
-                style={{ ...inputStyle, width: 150 }}
-                value={fProj}
-                onChange={e => setFProj(e.target.value)}
-                placeholder="All"
-              />
-            </FormGroup>
+              <FormGroup label="Project">
+                <input
+                  style={inputStyle}
+                  value={fProj}
+                  onChange={e => setFProj(e.target.value)}
+                  placeholder="Search project"
+                />
+              </FormGroup>
 
-            <div style={{ marginTop: 'auto' }}>
-              <Btn primary onClick={fetchLogs}>Filter</Btn>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                <Btn primary onClick={fetchLogs}>Apply</Btn>
+                <Btn onClick={() => { setFFrom(''); setFTo(''); setFCat(''); setFProj('') }}>Reset</Btn>
+              </div>
             </div>
-          </div>
+          </Card>
 
-          <Table heads={['Date', 'Project', 'Category', 'Task', 'Duration', '']} empty={logs.length === 0}>
-            {logs.map(l => (
-              <tr key={l.id}>
-                <Td>{fmtDate(l.date)}</Td>
-                <Td>{l.project}</Td>
-                <Td><Badge text={l.category} /></Td>
-                <Td style={{ maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{l.task}</Td>
-                <Td style={{ fontWeight: 500 }}>{formatDuration(l.hours)}</Td>
-                <Td>
-                  <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
-                    {canManage(l) && <Btn small onClick={() => startEdit(l)}>Edit</Btn>}
-                    {canManage(l) && <Btn small onClick={() => deleteLog(l.id)}>Delete</Btn>}
-                  </div>
-                </Td>
-              </tr>
-            ))}
-          </Table>
-        </Card>
+          <Card>
+            <CardTitle>Log History</CardTitle>
+
+            <Table heads={['Date', 'Project', 'Category', 'Task', 'Duration', '']} empty={logs.length === 0}>
+              {logs.map(l => (
+                <tr key={l.id}>
+                  <Td>{fmtDate(l.date)}</Td>
+                  <Td style={{ fontWeight: 600 }}>{l.project}</Td>
+                  <Td><Badge text={l.category} /></Td>
+                  <Td style={{ maxWidth: 260, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: '#5f6b85' }}>{l.task}</Td>
+                  <Td style={{ fontWeight: 700, fontFamily: 'DM Mono,monospace' }}>{formatDuration(l.hours)}</Td>
+                  <Td>
+                    <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+                      {canManage && <Btn small onClick={() => startEdit(l)}>Edit</Btn>}
+                      {canManage && <Btn small danger onClick={() => deleteLog(l.id)}>Delete</Btn>}
+                    </div>
+                  </Td>
+                </tr>
+              ))}
+            </Table>
+          </Card>
+        </div>
       </div>
     </div>
   )
 }
-
