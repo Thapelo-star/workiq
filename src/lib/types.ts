@@ -1,17 +1,26 @@
 export type Role = 'Employee' | 'Manager' | 'Executive' | 'Admin' | 'Project Lead'
 
-export type Category =
-  | 'Development' | 'Design' | 'Meetings'
-  | 'Research' | 'Admin' | 'Client' | 'Training'
-  | 'Test Work' | 'Test Work Admin' | 'Test Work Setup' | 'Consulting' | 'Mine Visit'
-  | 'Events' | 'Content Development' | 'Social Media Tracking and Monitoring' | 'Planning' | 'Other'
+export type Category = string
 
 export const CATEGORIES: Category[] = [
-  'Development','Design','Meetings','Research','Admin','Client','Training',
-  'Test Work','Test Work Admin','Test Work Setup','Consulting','Mine Visit',
-  'Events','Content Development','Social Media Tracking and Monitoring','Planning','Other',
+  'Content Development',
+  'Social Media',
+  'Social Media Tracking and Monitoring',
+  'Events',
+  'Planning',
+  'Design',
+  'Meetings',
+  'Research',
+  'Internal Communications',
+  'Website Management',
+  'Newsletter',
+  'Media Relations',
+  'Stakeholder Communication',
+  'Reporting',
+  'Administration',
+  'Training',
+  'Other',
 ]
-
 export const BILLABLE_CATEGORIES: Category[] = [
   'Development','Design','Client','Test Work','Test Work Setup'
 ]
@@ -28,6 +37,7 @@ export interface Profile {
 export interface TimeLog {
   id: string; user_id: string; date: string; project: string
   task: string; category: Category; hours: number; notes: string
+  custom_category?: string | null
   created_at: string; profiles?: Profile
 }
 export interface KpiRules {
@@ -127,3 +137,5 @@ export interface Goal {
   target_hours: number; target_billable_pct: number
   notes: string; set_by: string; profiles?: Profile
 }
+
+

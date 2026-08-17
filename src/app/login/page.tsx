@@ -51,7 +51,7 @@ export default function LoginPage() {
           return
         }
 
-        router.push('/dashboard')
+        router.push('/dashboard/time')
         router.refresh()
         return
       }
@@ -90,7 +90,7 @@ export default function LoginPage() {
           }
         }
 
-        router.push('/dashboard')
+        router.push('/dashboard/time')
         router.refresh()
       }
     } catch (err) {

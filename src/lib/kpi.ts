@@ -7,7 +7,10 @@ export function computeKpis(logs: TimeLog[]): KpiData {
   const catMap: Record<string, number> = {}
   const projMap: Record<string, number> = {}
   logs.forEach(l => {
-    catMap[l.category] = (catMap[l.category] || 0) + Number(l.hours)
+    const categoryName = l.category === 'Other' && l.custom_category?.trim()
+      ? l.custom_category.trim()
+      : l.category
+    catMap[categoryName] = (catMap[categoryName] || 0) + Number(l.hours)
     projMap[l.project] = (projMap[l.project] || 0) + Number(l.hours)
   })
   const billable = logs
@@ -114,4 +117,5 @@ export function fmtDate(d: string) {
   const parts = d.split('-')
   return parts[2] + '/' + parts[1] + '/' + parts[0]
 }
+
 

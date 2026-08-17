@@ -59,7 +59,7 @@ export default async function OverviewPage() {
                 <Td>{fmtDate(log.date)}</Td>
                 <Td>{(log.profiles as any)?.name || '-'}</Td>
                 <Td>{log.project}</Td>
-                <Td><Badge text={log.category} /></Td>
+                <Td><Badge text={log.category === 'Other' && log.custom_category ? log.custom_category : log.category} /></Td>
                 <Td style={{ fontWeight:600 }}>{log.hours}</Td>
               </tr>
             ))}

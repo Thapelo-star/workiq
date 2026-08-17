@@ -1,25 +1,42 @@
 'use client'
+
 import { useState, useEffect, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { TimeLog, Category, CATEGORIES, Profile } from '@/lib/types'
+import { TimeLog, Profile } from '@/lib/types'
 import { fmtDate, todayStr } from '@/lib/kpi'
-import { Card, CardTitle, PageHeader, Btn, Badge, Table, Td, FormGroup, inputStyle } from '@/components/ui'
+import {
+  Card,
+  CardTitle,
+  PageHeader,
+  Btn,
+  Badge,
+  Table,
+  Td,
+  FormGroup,
+  inputStyle
+} from '@/components/ui'
+
+type ManagedCategory = {
+  id: string
+  name: string
+  active: boolean
+  sort_order: number
+}
 
 function splitStoredHours(total: number) {
   const totalMinutes = Math.round(Number(total || 0) * 60)
-  const wholeHours = Math.floor(totalMinutes / 60)
-  const minutes = totalMinutes % 60
 
   return {
-    hours: String(wholeHours),
-    minutes: String(minutes),
+    hours: String(Math.floor(totalMinutes / 60)),
+    minutes: String(totalMinutes % 60),
   }
 }
 
 function buildStoredHours(hoursText: string, minutesText: string) {
   const hrs = parseInt(hoursText || '0', 10) || 0
   const mins = parseInt(minutesText || '0', 10) || 0
-  return Number((hrs + (mins / 60)).toFixed(4))
+
+  return Number((hrs + mins / 60).toFixed(4))
 }
 
 function formatDuration(total: number) {
@@ -27,10 +44,26 @@ function formatDuration(total: number) {
   const hrs = Math.floor(totalMinutes / 60)
   const mins = totalMinutes % 60
 
-  return mins > 0 ? `${hrs}h ${String(mins).padStart(2, '0')}m` : `${hrs}h`
+  if (hrs === 0) return `${mins}m`
+  if (mins === 0) return `${hrs}h`
+
+  return `${hrs}h ${String(mins).padStart(2, '0')}m`
 }
 
-function StatCard(props: { label: string; value: string; sub?: string; color: string }) {
+function displayCategory(log: TimeLog) {
+  if (log.category === 'Other' && log.custom_category?.trim()) {
+    return log.custom_category.trim()
+  }
+
+  return log.category
+}
+
+function StatCard(props: {
+  label: string
+  value: string
+  sub?: string
+  color: string
+}) {
   return (
     <div
       style={{
@@ -43,22 +76,58 @@ function StatCard(props: { label: string; value: string; sub?: string; color: st
         overflow: 'hidden',
       }}
     >
-      <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 3, background: props.color }} />
-      <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: '0.12em', textTransform: 'uppercase', color: '#98a2b3', marginBottom: 8 }}>
+      <div
+        style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          height: 3,
+          background: props.color,
+        }}
+      />
+
+      <div
+        style={{
+          fontSize: 10,
+          fontWeight: 800,
+          letterSpacing: '0.12em',
+          textTransform: 'uppercase',
+          color: '#98a2b3',
+          marginBottom: 8,
+        }}
+      >
         {props.label}
       </div>
-      <div style={{ fontSize: 24, fontWeight: 900, fontFamily: 'DM Mono,monospace', color: '#141b2d', lineHeight: 1.1 }}>
+
+      <div
+        style={{
+          fontSize: 24,
+          fontWeight: 900,
+          fontFamily: 'DM Mono,monospace',
+          color: '#141b2d',
+        }}
+      >
         {props.value}
       </div>
-      {props.sub && <div style={{ fontSize: 12, color: '#6b7280', marginTop: 7 }}>{props.sub}</div>}
+
+      {props.sub && (
+        <div style={{ fontSize: 12, color: '#6b7280', marginTop: 7 }}>
+          {props.sub}
+        </div>
+      )}
     </div>
   )
 }
 
 export default function TimePage() {
   const supabase = createClient()
+
   const [profile, setProfile] = useState<Profile | null>(null)
+
   const [logs, setLogs] = useState<TimeLog[]>([])
+  const [categories, setCategories] = useState<ManagedCategory[]>([])
+
   const [loading, setLoading] = useState(false)
   const [msg, setMsg] = useState('')
   const [msgType, setMsgType] = useState<'ok' | 'err'>('ok')
@@ -68,9 +137,12 @@ export default function TimePage() {
   const [date, setDate] = useState(todayStr())
   const [hours, setHours] = useState('')
   const [minutes, setMinutes] = useState('0')
+
   const [project, setProject] = useState('')
-  const [category, setCategory] = useState<Category | ''>('')
-  const [task, setTask] = useState('')
+
+  const [categoryChoice, setCategoryChoice] = useState('')
+  const [customCategory, setCustomCategory] = useState('')
+
   const [notes, setNotes] = useState('')
 
   const [fFrom, setFFrom] = useState('')
@@ -78,24 +150,48 @@ export default function TimePage() {
   const [fCat, setFCat] = useState('')
   const [fProj, setFProj] = useState('')
 
+  const fetchReferenceData = useCallback(async () => {
+    const categoryResult = await supabase
+      .from('time_categories')
+      .select('*')
+      .eq('active', true)
+      .order('sort_order')
+      .order('name')
+
+    setCategories(categoryResult.data || [])
+  }, [supabase])
+
   const fetchProfile = useCallback(async () => {
     const { data: { user } } = await supabase.auth.getUser()
+
     if (!user) return
-    const { data } = await supabase.from('profiles').select('*').eq('id', user.id).single()
+
+    const { data } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', user.id)
+      .single()
+
     setProfile(data)
   }, [supabase])
 
   const fetchLogs = useCallback(async () => {
     const { data: { user } } = await supabase.auth.getUser()
+
     if (!user) return
 
-    const { data: prof } = await supabase.from('profiles').select('role').eq('id', user.id).single()
+    const { data: prof } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', user.id)
+      .single()
 
     let q = supabase
       .from('time_logs')
       .select('*, profiles(name,role,team)')
       .order('date', { ascending: false })
-      .limit(500)
+      .order('created_at', { ascending: false })
+      .limit(1000)
 
     if (prof?.role === 'Employee') {
       q = q.eq('user_id', user.id)
@@ -103,13 +199,23 @@ export default function TimePage() {
 
     if (fFrom) q = q.gte('date', fFrom)
     if (fTo) q = q.lte('date', fTo)
-    if (fCat) q = q.eq('category', fCat)
+
+    if (fCat) {
+      if (fCat === '__custom__') {
+        q = q.eq('category', 'Other')
+      } else {
+        q = q.eq('category', fCat)
+      }
+    }
 
     const { data } = await q
+
     let result: TimeLog[] = data || []
 
     if (fProj) {
-      result = result.filter(l => l.project.toLowerCase().includes(fProj.toLowerCase()))
+      result = result.filter(log =>
+        (log.project || '').toLowerCase().includes(fProj.toLowerCase())
+      )
     }
 
     setLogs(result)
@@ -117,8 +223,17 @@ export default function TimePage() {
 
   useEffect(() => {
     fetchProfile()
+    fetchReferenceData()
+  }, [fetchProfile, fetchReferenceData])
+
+  useEffect(() => {
     fetchLogs()
-  }, [fetchProfile, fetchLogs])
+  }, [fetchLogs])
+
+  function setQuickDuration(totalMinutes: number) {
+    setHours(String(Math.floor(totalMinutes / 60)))
+    setMinutes(String(totalMinutes % 60))
+  }
 
   function resetForm() {
     setEditingId('')
@@ -126,35 +241,52 @@ export default function TimePage() {
     setHours('')
     setMinutes('0')
     setProject('')
-    setCategory('')
-    setTask('')
+    setCategoryChoice('')
+    setCustomCategory('')
     setNotes('')
     setMsg('')
   }
 
   function startEdit(log: TimeLog) {
     const split = splitStoredHours(log.hours)
+
     setEditingId(log.id)
     setDate(log.date)
     setHours(split.hours)
     setMinutes(split.minutes)
-    setProject(log.project)
-    setCategory(log.category)
-    setTask(log.task)
+
+    setProject(log.project || '')
+
+    const categoryExists = categories.some(c => c.name === log.category)
+
+    if (log.category === 'Other') {
+      setCategoryChoice('Other')
+      setCustomCategory(log.custom_category || '')
+    } else if (categoryExists) {
+      setCategoryChoice(log.category)
+      setCustomCategory('')
+    } else {
+      setCategoryChoice('Other')
+      setCustomCategory(log.category || '')
+    }
+
     setNotes(log.notes || '')
     setMsg('')
+
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
   async function saveLog() {
-    if (!date || !project || !category || !task) {
-      setMsg('Please fill in all required fields.')
-      setMsgType('err')
-      return
-    }
+    setMsg('')
 
     const hrs = parseInt(hours || '0', 10) || 0
     const mins = parseInt(minutes || '0', 10) || 0
+
+    if (!date) {
+      setMsg('Please select a date.')
+      setMsgType('err')
+      return
+    }
 
     if (hrs === 0 && mins === 0) {
       setMsg('Please enter a duration greater than zero.')
@@ -168,10 +300,55 @@ export default function TimePage() {
       return
     }
 
+    if (!project.trim()) {
+      setMsg('Please enter a project.')
+      setMsgType('err')
+      return
+    }
+
+    if (!categoryChoice) {
+      setMsg('Please select a category.')
+      setMsgType('err')
+      return
+    }
+
+    if (categoryChoice === 'Other' && !customCategory.trim()) {
+      setMsg('Please enter an additional category.')
+      setMsgType('err')
+      return
+    }
+
+    const actualProject = project.trim()
+
+    const actualCategory =
+      categoryChoice === 'Other'
+        ? 'Other'
+        : categoryChoice
+
     const totalHours = buildStoredHours(hours, minutes)
 
     const { data: { user } } = await supabase.auth.getUser()
+
     if (!user) return
+
+    const hiddenTask =
+      notes.trim() ||
+      (categoryChoice === 'Other'
+        ? customCategory.trim()
+        : categoryChoice)
+
+    const payload = {
+      date,
+      project: actualProject,
+      category: actualCategory,
+      custom_category:
+        categoryChoice === 'Other'
+          ? customCategory.trim()
+          : null,
+      hours: totalHours,
+      notes: notes.trim(),
+      task: hiddenTask,
+    }
 
     setLoading(true)
 
@@ -180,14 +357,7 @@ export default function TimePage() {
     if (editingId) {
       const result = await supabase
         .from('time_logs')
-        .update({
-          date,
-          project,
-          task,
-          category,
-          hours: totalHours,
-          notes,
-        })
+        .update(payload)
         .eq('id', editingId)
 
       error = result.error
@@ -196,12 +366,7 @@ export default function TimePage() {
         .from('time_logs')
         .insert({
           user_id: user.id,
-          date,
-          project,
-          task,
-          category,
-          hours: totalHours,
-          notes,
+          ...payload,
         })
 
       error = result.error
@@ -212,31 +377,57 @@ export default function TimePage() {
     if (error) {
       setMsg(error.message)
       setMsgType('err')
-    } else {
-      setMsg(editingId ? 'Log updated successfully.' : 'Log saved successfully.')
-      setMsgType('ok')
-      resetForm()
-      fetchLogs()
-      setTimeout(() => setMsg(''), 3000)
+      return
     }
+
+    setMsg(
+      editingId
+        ? 'Log updated successfully.'
+        : 'Log saved successfully.'
+    )
+
+    setMsgType('ok')
+
+    const savedDate = date
+
+    setEditingId('')
+    setDate(savedDate)
+    setHours('')
+    setMinutes('0')
+    setProject('')
+    setCategoryChoice('')
+    setCustomCategory('')
+    setNotes('')
+
+    fetchLogs()
+
+    setTimeout(() => setMsg(''), 3000)
   }
 
   async function deleteLog(id: string) {
     if (!confirm('Delete this time log?')) return
-    await supabase.from('time_logs').delete().eq('id', id)
 
-    if (editingId === id) {
-      resetForm()
-    }
+    await supabase
+      .from('time_logs')
+      .delete()
+      .eq('id', id)
+
+    if (editingId === id) resetForm()
 
     fetchLogs()
   }
 
   function escapeCsv(value: unknown) {
     const text = String(value ?? '')
-    if (text.includes(',') || text.includes('"') || text.includes('\n')) {
+
+    if (
+      text.includes(',') ||
+      text.includes('"') ||
+      text.includes('\n')
+    ) {
       return '"' + text.replace(/"/g, '""') + '"'
     }
+
     return text
   }
 
@@ -253,7 +444,6 @@ export default function TimePage() {
       'Team',
       'Project',
       'Category',
-      'Task',
       'Hours',
       'Minutes',
       'Duration',
@@ -262,62 +452,159 @@ export default function TimePage() {
 
     const rows = logs.map(log => {
       const parts = splitStoredHours(log.hours)
+
       return [
         log.date,
         (log.profiles as any)?.name || '',
         (log.profiles as any)?.team || '',
         log.project,
-        log.category,
-        log.task,
+        displayCategory(log),
         parts.hours,
         parts.minutes,
         formatDuration(log.hours),
         log.notes || '',
-      ].map(escapeCsv).join(',')
+      ]
+        .map(escapeCsv)
+        .join(',')
     })
 
     const csv = [headers.join(','), ...rows].join('\r\n')
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+
+    const blob = new Blob(
+      [csv],
+      { type: 'text/csv;charset=utf-8;' }
+    )
+
     const url = window.URL.createObjectURL(blob)
     const link = document.createElement('a')
-    const stamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-')
+
+    const stamp = new Date()
+      .toISOString()
+      .slice(0, 19)
+      .replace(/[:T]/g, '-')
 
     link.href = url
-    link.setAttribute('download', `workiq_logs_${stamp}.csv`)
+    link.setAttribute(
+      'download',
+      `workiq_pr_logs_${stamp}.csv`
+    )
+
     document.body.appendChild(link)
     link.click()
     document.body.removeChild(link)
+
     window.URL.revokeObjectURL(url)
   }
 
-  const canManage = profile?.role !== 'Executive'
-  const canExport = ['Manager', 'Admin', 'Executive'].includes(profile?.role || '')
+  function resetFilters() {
+    setFFrom('')
+    setFTo('')
+    setFCat('')
+    setFProj('')
+  }
 
-  const totalMinutes = logs.reduce((sum, log) => sum + Math.round(Number(log.hours || 0) * 60), 0)
-  const totalHoursDisplay = formatDuration(totalMinutes / 60)
-  const uniqueProjects = Array.from(new Set(logs.map(l => l.project).filter(Boolean))).length
-  const uniqueCategories = Array.from(new Set(logs.map(l => l.category).filter(Boolean))).length
-  const activeDays = Array.from(new Set(logs.map(l => l.date))).length
+  const canExport =
+    profile?.role === 'Manager' ||
+    profile?.role === 'Admin'
+
+  function canManageLog(log: TimeLog) {
+    if (!profile) return false
+
+    if (
+      profile.role === 'Manager' ||
+      profile.role === 'Admin'
+    ) {
+      return true
+    }
+
+    return log.user_id === profile.id
+  }
+
+  const totalMinutes = logs.reduce(
+    (sum, log) =>
+      sum + Math.round(Number(log.hours || 0) * 60),
+    0
+  )
+
+  const uniqueProjects =
+    Array.from(
+      new Set(logs.map(l => l.project).filter(Boolean))
+    ).length
+
+  const uniqueCategories =
+    Array.from(
+      new Set(logs.map(l => displayCategory(l)))
+    ).length
+
+  const activeDays =
+    Array.from(
+      new Set(logs.map(l => l.date))
+    ).length
 
   return (
     <div>
       <PageHeader
         title="Time Capture"
-        subtitle="Log work clearly, manage mistakes quickly, and keep a clean time history."
-        action={canExport ? <Btn onClick={exportLogs}>Export Logs</Btn> : undefined}
+        subtitle="Record PR work quickly and keep an accurate activity history."
+        action={
+          canExport
+            ? <Btn onClick={exportLogs}>Export Logs</Btn>
+            : undefined
+        }
       />
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(180px,1fr))', gap: 14, marginBottom: 22 }}>
-        <StatCard label="Log Entries" value={String(logs.length)} color="#5b5ce2" />
-        <StatCard label="Total Logged" value={totalHoursDisplay} sub="Current filtered view" color="#0ea5e9" />
-        <StatCard label="Projects" value={String(uniqueProjects)} sub="Distinct projects" color="#059669" />
-        <StatCard label="Categories" value={String(uniqueCategories)} sub="Distinct categories" color="#d97706" />
-        <StatCard label="Active Days" value={String(activeDays)} sub="Days with logs" color="#7c3aed" />
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit,minmax(180px,1fr))',
+          gap: 14,
+          marginBottom: 22,
+        }}
+      >
+        <StatCard
+          label="Log Entries"
+          value={String(logs.length)}
+          color="#5b5ce2"
+        />
+
+        <StatCard
+          label="Total Logged"
+          value={formatDuration(totalMinutes / 60)}
+          sub="Current view"
+          color="#0ea5e9"
+        />
+
+        <StatCard
+          label="Projects"
+          value={String(uniqueProjects)}
+          color="#059669"
+        />
+
+        <StatCard
+          label="Categories"
+          value={String(uniqueCategories)}
+          color="#d97706"
+        />
+
+        <StatCard
+          label="Active Days"
+          value={String(activeDays)}
+          color="#7c3aed"
+        />
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '390px 1fr', gap: 20, alignItems: 'start' }}>
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: '390px minmax(0,1fr)',
+          gap: 20,
+          alignItems: 'start',
+        }}
+      >
         <Card accent={editingId ? '#d97706' : '#5b5ce2'}>
-          <CardTitle>{editingId ? 'Edit Time Log' : 'Add Time Log'}</CardTitle>
+          <CardTitle>
+            {editingId ? 'Edit Time Log' : 'Add Time Log'}
+          </CardTitle>
 
           <div
             style={{
@@ -331,16 +618,41 @@ export default function TimePage() {
               fontWeight: 600,
             }}
           >
-            Logging for: <span style={{ color: '#141b2d', fontWeight: 800 }}>{fmtDate(date)}</span>
+            Logging for:{' '}
+            <span
+              style={{
+                color: '#141b2d',
+                fontWeight: 800,
+              }}
+            >
+              {fmtDate(date)}
+            </span>
           </div>
 
           {editingId && (
-            <div style={{ marginBottom: 14, padding: '10px 12px', borderRadius: 12, background: '#fff7ed', border: '1px solid #fed7aa', color: '#9a3412', fontSize: 13, fontWeight: 600 }}>
+            <div
+              style={{
+                marginBottom: 14,
+                padding: '10px 12px',
+                borderRadius: 12,
+                background: '#fff7ed',
+                border: '1px solid #fed7aa',
+                color: '#9a3412',
+                fontSize: 13,
+                fontWeight: 600,
+              }}
+            >
               You are editing an existing time log.
             </div>
           )}
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: '1fr 1fr',
+              gap: 12,
+            }}
+          >
             <FormGroup label="Date *">
               <input
                 style={inputStyle}
@@ -351,8 +663,24 @@ export default function TimePage() {
             </FormGroup>
 
             <div>
-              <div style={{ fontSize: 12, fontWeight: 700, color: '#5f6b85', marginBottom: 7 }}>Duration *</div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+              <div
+                style={{
+                  fontSize: 12,
+                  fontWeight: 700,
+                  color: '#5f6b85',
+                  marginBottom: 7,
+                }}
+              >
+                Duration *
+              </div>
+
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: '1fr 1fr',
+                  gap: 8,
+                }}
+              >
                 <input
                   style={inputStyle}
                   type="number"
@@ -363,6 +691,7 @@ export default function TimePage() {
                   onChange={e => setHours(e.target.value)}
                   placeholder="Hours"
                 />
+
                 <input
                   style={inputStyle}
                   type="number"
@@ -377,12 +706,58 @@ export default function TimePage() {
             </div>
 
             <div style={{ gridColumn: '1 / -1' }}>
+              <div
+                style={{
+                  fontSize: 11,
+                  fontWeight: 700,
+                  color: '#98a2b3',
+                  marginBottom: 7,
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.08em',
+                }}
+              >
+                Quick duration
+              </div>
+
+              <div
+                style={{
+                  display: 'flex',
+                  gap: 7,
+                  flexWrap: 'wrap',
+                }}
+              >
+                {[15, 30, 45, 60, 120].map(value => (
+                  <button
+                    key={value}
+                    type="button"
+                    onClick={() => setQuickDuration(value)}
+                    style={{
+                      border: '1px solid #e6ebf3',
+                      background: '#fff',
+                      borderRadius: 10,
+                      padding: '7px 11px',
+                      cursor: 'pointer',
+                      fontFamily: 'inherit',
+                      fontSize: 12,
+                      fontWeight: 700,
+                      color: '#5b5ce2',
+                    }}
+                  >
+                    {value < 60
+                      ? `${value} min`
+                      : `${value / 60}h`}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div style={{ gridColumn: '1 / -1' }}>
               <FormGroup label="Project *">
                 <input
                   style={inputStyle}
                   value={project}
                   onChange={e => setProject(e.target.value)}
-                  placeholder="e.g. WorkIQ Internal, Campaign, Client Project"
+                  placeholder="Enter project or work area"
                 />
               </FormGroup>
             </div>
@@ -391,30 +766,54 @@ export default function TimePage() {
               <FormGroup label="Category *">
                 <select
                   style={inputStyle}
-                  value={category}
-                  onChange={e => setCategory(e.target.value as Category)}
+                  value={categoryChoice}
+                  onChange={e => {
+                    setCategoryChoice(e.target.value)
+
+                    if (e.target.value !== 'Other') {
+                      setCustomCategory('')
+                    }
+                  }}
                 >
-                  <option value="">Select category</option>
-                  {CATEGORIES.map(c => <option key={c}>{c}</option>)}
+                  <option value="">
+                    Select category
+                  </option>
+
+                  {categories.map(category => (
+                    <option
+                      key={category.id}
+                      value={category.name}
+                    >
+                      {category.name}
+                    </option>
+                  ))}
                 </select>
               </FormGroup>
             </div>
 
-            <div style={{ gridColumn: '1 / -1' }}>
-              <FormGroup label="Task Description *">
-                <input
-                  style={inputStyle}
-                  value={task}
-                  onChange={e => setTask(e.target.value)}
-                  placeholder="What exactly did you work on?"
-                />
-              </FormGroup>
-            </div>
+            {categoryChoice === 'Other' && (
+              <div style={{ gridColumn: '1 / -1' }}>
+                <FormGroup label="Additional Category *">
+                  <input
+                    style={inputStyle}
+                    value={customCategory}
+                    onChange={e =>
+                      setCustomCategory(e.target.value)
+                    }
+                    placeholder="Enter the category"
+                  />
+                </FormGroup>
+              </div>
+            )}
 
             <div style={{ gridColumn: '1 / -1' }}>
               <FormGroup label="Notes (optional)">
                 <textarea
-                  style={{ ...inputStyle, resize: 'vertical', minHeight: 84 }}
+                  style={{
+                    ...inputStyle,
+                    resize: 'vertical',
+                    minHeight: 90,
+                  }}
                   value={notes}
                   onChange={e => setNotes(e.target.value)}
                   placeholder="Add any useful context..."
@@ -423,11 +822,33 @@ export default function TimePage() {
             </div>
           </div>
 
-          <div style={{ marginTop: 18, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-            <Btn primary onClick={saveLog} disabled={loading}>
-              {loading ? (editingId ? 'Updating...' : 'Saving...') : (editingId ? 'Update Log' : 'Save Log')}
+          <div
+            style={{
+              marginTop: 18,
+              display: 'flex',
+              gap: 8,
+              flexWrap: 'wrap',
+            }}
+          >
+            <Btn
+              primary
+              onClick={saveLog}
+              disabled={loading}
+            >
+              {loading
+                ? editingId
+                  ? 'Updating...'
+                  : 'Saving...'
+                : editingId
+                  ? 'Update Log'
+                  : 'Save Log'}
             </Btn>
-            <Btn onClick={resetForm}>{editingId ? 'Cancel Edit' : 'Clear'}</Btn>
+
+            <Btn onClick={resetForm}>
+              {editingId
+                ? 'Cancel Edit'
+                : 'Clear'}
+            </Btn>
           </div>
 
           {msg && (
@@ -435,11 +856,20 @@ export default function TimePage() {
               style={{
                 marginTop: 12,
                 fontSize: 13,
-                color: msgType === 'ok' ? '#166534' : '#b91c1c',
+                color:
+                  msgType === 'ok'
+                    ? '#166534'
+                    : '#b91c1c',
                 padding: '10px 12px',
                 borderRadius: 12,
-                background: msgType === 'ok' ? '#dcfce7' : '#fee2e2',
-                border: msgType === 'ok' ? '1px solid #bbf7d0' : '1px solid #fecaca',
+                background:
+                  msgType === 'ok'
+                    ? '#dcfce7'
+                    : '#fee2e2',
+                border:
+                  msgType === 'ok'
+                    ? '1px solid #bbf7d0'
+                    : '1px solid #fecaca',
                 fontWeight: 600,
               }}
             >
@@ -448,17 +878,34 @@ export default function TimePage() {
           )}
         </Card>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+        <div
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 18,
+            minWidth: 0,
+          }}
+        >
           <Card>
             <CardTitle>Filters</CardTitle>
 
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(150px,1fr))', gap: 12, alignItems: 'end' }}>
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns:
+                  'repeat(auto-fit,minmax(145px,1fr))',
+                gap: 12,
+                alignItems: 'end',
+              }}
+            >
               <FormGroup label="From">
                 <input
                   style={inputStyle}
                   type="date"
                   value={fFrom}
-                  onChange={e => setFFrom(e.target.value)}
+                  onChange={e =>
+                    setFFrom(e.target.value)
+                  }
                 />
               </FormGroup>
 
@@ -467,7 +914,9 @@ export default function TimePage() {
                   style={inputStyle}
                   type="date"
                   value={fTo}
-                  onChange={e => setFTo(e.target.value)}
+                  onChange={e =>
+                    setFTo(e.target.value)
+                  }
                 />
               </FormGroup>
 
@@ -475,10 +924,24 @@ export default function TimePage() {
                 <select
                   style={inputStyle}
                   value={fCat}
-                  onChange={e => setFCat(e.target.value)}
+                  onChange={e =>
+                    setFCat(e.target.value)
+                  }
                 >
                   <option value="">All</option>
-                  {CATEGORIES.map(c => <option key={c}>{c}</option>)}
+
+                  {categories.map(category => (
+                    <option
+                      key={category.id}
+                      value={category.name}
+                    >
+                      {category.name}
+                    </option>
+                  ))}
+
+                  <option value="__custom__">
+                    Additional Categories
+                  </option>
                 </select>
               </FormGroup>
 
@@ -486,14 +949,27 @@ export default function TimePage() {
                 <input
                   style={inputStyle}
                   value={fProj}
-                  onChange={e => setFProj(e.target.value)}
+                  onChange={e =>
+                    setFProj(e.target.value)
+                  }
                   placeholder="Search project"
                 />
               </FormGroup>
 
-              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                <Btn primary onClick={fetchLogs}>Apply</Btn>
-                <Btn onClick={() => { setFFrom(''); setFTo(''); setFCat(''); setFProj('') }}>Reset</Btn>
+              <div
+                style={{
+                  display: 'flex',
+                  gap: 8,
+                  flexWrap: 'wrap',
+                }}
+              >
+                <Btn primary onClick={fetchLogs}>
+                  Apply
+                </Btn>
+
+                <Btn onClick={resetFilters}>
+                  Reset
+                </Btn>
               </div>
             </div>
           </Card>
@@ -501,18 +977,87 @@ export default function TimePage() {
           <Card>
             <CardTitle>Log History</CardTitle>
 
-            <Table heads={['Date', 'Project', 'Category', 'Task', 'Duration', '']} empty={logs.length === 0}>
-              {logs.map(l => (
-                <tr key={l.id}>
-                  <Td>{fmtDate(l.date)}</Td>
-                  <Td style={{ fontWeight: 600 }}>{l.project}</Td>
-                  <Td><Badge text={l.category} /></Td>
-                  <Td style={{ maxWidth: 260, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: '#5f6b85' }}>{l.task}</Td>
-                  <Td style={{ fontWeight: 700, fontFamily: 'DM Mono,monospace' }}>{formatDuration(l.hours)}</Td>
+            <Table
+              heads={[
+                'Date',
+                'Project',
+                'Category',
+                'Notes',
+                'Duration',
+                ''
+              ]}
+              empty={logs.length === 0}
+            >
+              {logs.map(log => (
+                <tr key={log.id}>
                   <Td>
-                    <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
-                      {canManage && <Btn small onClick={() => startEdit(l)}>Edit</Btn>}
-                      {canManage && <Btn small danger onClick={() => deleteLog(l.id)}>Delete</Btn>}
+                    {fmtDate(log.date)}
+                  </Td>
+
+                  <Td style={{ fontWeight: 600 }}>
+                    {log.project}
+                  </Td>
+
+                  <Td>
+                    <Badge
+                      text={displayCategory(log)}
+                    />
+                  </Td>
+
+                  <Td
+                    style={{
+                      maxWidth: 280,
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                      color: '#5f6b85',
+                    }}
+                  >
+                    {log.notes || '-'}
+                  </Td>
+
+                  <Td
+                    style={{
+                      fontWeight: 700,
+                      fontFamily:
+                        'DM Mono,monospace',
+                    }}
+                  >
+                    {formatDuration(log.hours)}
+                  </Td>
+
+                  <Td>
+                    <div
+                      style={{
+                        display: 'flex',
+                        gap: 6,
+                        justifyContent:
+                          'flex-end',
+                        flexWrap: 'wrap',
+                      }}
+                    >
+                      {canManageLog(log) && (
+                        <Btn
+                          small
+                          onClick={() =>
+                            startEdit(log)
+                          }
+                        >
+                          Edit
+                        </Btn>
+                      )}
+
+                      {canManageLog(log) && (
+                        <Btn
+                          small
+                          danger
+                          onClick={() =>
+                            deleteLog(log.id)
+                          }
+                        >
+                          Delete
+                        </Btn>
+                      )}
                     </div>
                   </Td>
                 </tr>
