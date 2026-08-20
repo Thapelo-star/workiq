@@ -595,12 +595,7 @@ export default function TrendsPage() {
       me.role === 'Executive'
     )
 
-  const prProfiles =
-    profiles.filter(
-      p =>
-        p.team ===
-        'PR Department'
-    )
+  const prProfiles = profiles
 
   let scopedLogs =
     logs
@@ -617,16 +612,7 @@ export default function TrendsPage() {
     elevated &&
     scope === 'department'
   ) {
-    const prIds =
-      new Set(
-        prProfiles.map(p => p.id)
-      )
-
-    scopedLogs =
-      logs.filter(
-        log =>
-          prIds.has(log.user_id)
-      )
+    scopedLogs = logs
   }
 
   if (
@@ -1316,3 +1302,4 @@ export default function TrendsPage() {
     </div>
   )
 }
+
