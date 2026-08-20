@@ -1073,7 +1073,76 @@ export default function TrendsPage() {
           marginBottom: 20,
         }}
       >
-        <CardTitle>
+        {filtered.length > 0 && (
+        <>
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns:
+                'repeat(auto-fit,minmax(320px,1fr))',
+              gap: 20,
+              marginBottom: 20,
+            }}
+          >
+            <Card>
+              <CardTitle>
+                Category Breakdown
+              </CardTitle>
+
+              <BarList
+                data={categories}
+                total={totalHours}
+              />
+            </Card>
+
+            <Card>
+              <CardTitle>
+                Project Breakdown
+              </CardTitle>
+
+              <BarList
+                data={projects}
+                total={totalHours}
+              />
+            </Card>
+          </div>
+
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns:
+                'repeat(auto-fit,minmax(320px,1fr))',
+              gap: 20,
+            }}
+          >
+            <Card>
+              <CardTitle>
+                Daily Hours
+              </CardTitle>
+
+              <DailyBars
+                data={daily}
+              />
+            </Card>
+
+            {elevated &&
+             scope === 'department' && (
+              <Card>
+                <CardTitle>
+                  Hours by Person
+                </CardTitle>
+
+                <BarList
+                  data={people}
+                  total={totalHours}
+                />
+              </Card>
+            )}
+          </div>
+        </>
+      )}
+
+      <CardTitle>
           Daily Activity
         </CardTitle>
 
@@ -1230,76 +1299,8 @@ export default function TrendsPage() {
           </div>
         ))}
       </Card>
-
-      {filtered.length > 0 && (
-        <>
-          <div
-            style={{
-              display: 'grid',
-              gridTemplateColumns:
-                'repeat(auto-fit,minmax(320px,1fr))',
-              gap: 20,
-              marginBottom: 20,
-            }}
-          >
-            <Card>
-              <CardTitle>
-                Category Breakdown
-              </CardTitle>
-
-              <BarList
-                data={categories}
-                total={totalHours}
-              />
-            </Card>
-
-            <Card>
-              <CardTitle>
-                Project Breakdown
-              </CardTitle>
-
-              <BarList
-                data={projects}
-                total={totalHours}
-              />
-            </Card>
-          </div>
-
-          <div
-            style={{
-              display: 'grid',
-              gridTemplateColumns:
-                'repeat(auto-fit,minmax(320px,1fr))',
-              gap: 20,
-            }}
-          >
-            <Card>
-              <CardTitle>
-                Daily Hours
-              </CardTitle>
-
-              <DailyBars
-                data={daily}
-              />
-            </Card>
-
-            {elevated &&
-             scope === 'department' && (
-              <Card>
-                <CardTitle>
-                  Hours by Person
-                </CardTitle>
-
-                <BarList
-                  data={people}
-                  total={totalHours}
-                />
-              </Card>
-            )}
-          </div>
-        </>
-      )}
     </div>
   )
 }
+
 
