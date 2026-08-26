@@ -1,4 +1,4 @@
-﻿@tailwind base;
+@tailwind base;
 @tailwind components;
 @tailwind utilities;
 
@@ -12,9 +12,29 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-::-webkit-scrollbar { width: 4px; height: 4px; }
-::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 4px; }
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: #eef1f6;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #a8b0c0;
+  border-radius: 999px;
+  border: 2px solid #eef1f6;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #747f95;
+}
+
+* {
+  scrollbar-width: auto;
+  scrollbar-color: #a8b0c0 #eef1f6;
+}
 
 input, select, textarea, button { font-family: inherit; }
 ::selection { background: #6366f1; color: #fff; }
@@ -29,3 +49,4 @@ input, select, textarea, button { font-family: inherit; }
   .grid-4 { grid-template-columns: 1fr 1fr !important; }
   .hide-mobile { display: none !important; }
 }
+

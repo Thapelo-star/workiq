@@ -158,7 +158,13 @@ export default function TimePage() {
       .order('sort_order')
       .order('name')
 
-    setCategories(categoryResult.data || [])
+    const sortedCategories = [...(categoryResult.data || [])].sort((a, b) => {
+      if (a.name === 'Other') return 1
+      if (b.name === 'Other') return -1
+      return a.name.localeCompare(b.name)
+    })
+
+    setCategories(sortedCategories)
   }, [supabase])
 
   const fetchProfile = useCallback(async () => {
@@ -1069,4 +1075,5 @@ export default function TimePage() {
     </div>
   )
 }
+
 
